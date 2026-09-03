@@ -711,15 +711,22 @@ let currentRole  = '';  // 'bakery' | 'FHK' | 'STB' | 'JHK'
 let currentDate  = '';
 
 async function gas(params, method='GET') {
-  const url = method === 'GET'
-    ? APPS_SCRIPT_URL + '?' + new URLSearchParams(params).toString()
-    : APPS_SCRIPT_URL;
-  const opts = method === 'GET' ? {} : {
-    method: 'POST',
-    body: JSON.stringify(params),
-  };
-  const r = await fetch(url, opts);
-  return r.json();
+  try {
+    if (method === 'GET') {
+      // GAS handles GET from any origin fine
+      const url = APPS_SCRIPT_URL + '?' + new URLSearchParams(params).toString();
+      const r = await fetch(url, { redirect: 'follow' });
+      return await r.json();
+    } else {
+      // FormData avoids CORS preflight — required for GAS cross-origin POST
+      const form = new FormData();
+      form.append('payload', JSON.stringify(params));
+      const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: form, redirect: 'follow' });
+      return await r.json();
+    }
+  } catch(e) {
+    throw new Error('Network error: ' + e.message);
+  }
 }
 
 // ── ROLE PICKER ──────────────────────────────────────────────
@@ -745,7 +752,10 @@ async function startRole(role) {
   const date = document.getElementById('roleDate').value;
   if (!date) { document.getElementById('roleStatus').textContent = '⚠️ Please pick a date'; return; }
   const statusEl = document.getElementById('roleStatus');
-  statusEl.textContent = 'Loading from Google Sheets…';
+  statusEl.style.color = '#8A7060';
+  statusEl.textContent = '⏳ Loading from Google Sheets…';
+  // Disable buttons while loading
+  document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = true);
 
   currentRole = role;
   currentDate = date;
@@ -764,7 +774,9 @@ async function startRole(role) {
       renderNameFields();
       showToast('✅ Mix loaded for all 3 stores');
     } catch(e) {
-      statusEl.textContent = '❌ ' + e.message + ' — check APPS_SCRIPT_URL';
+      statusEl.style.color = '#C44A2A';
+      statusEl.textContent = '❌ ' + e.message;
+      document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = false);
     }
   } else {
     // Store role: FHK, STB, JHK
@@ -782,7 +794,9 @@ async function startRole(role) {
       renderNameFields();
       showToast('✅ Sheet loaded for ' + role);
     } catch(e) {
-      statusEl.textContent = '❌ ' + e.message + ' — check APPS_SCRIPT_URL';
+      statusEl.style.color = '#C44A2A';
+      statusEl.textContent = '❌ ' + e.message;
+      document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = false);
     }
   }
 }
@@ -1659,7 +1673,7 @@ function decodeSnapshot(hash) {
 
 // ── CONFIGURATION ──────────────────────────────────────────────
 // Paste your Google Apps Script Web App URL here after deploying
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbgeoY9ZBt8RV9VPVBElW309YTj6YJbfjWuu4dYTDtkFb8TbmV8qEjCp0wVBJIEWgy/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxj3O8z3r05PNM1wDCDD-_ytUZ1n3g_31-DM0HwHehgLqHF4FsW97DcUTdBlGkRLTL/exec';
 // ────────────────────────────────────────────────────────────────
 
 /* ── INIT ── */
