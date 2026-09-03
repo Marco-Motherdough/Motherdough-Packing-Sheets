@@ -544,925 +544,13 @@
   <div id="rolePicker" style="display:flex;position:fixed;inset:0;background:rgba(28,20,16,0.85);z-index:9000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:#FAF7F2;border-radius:20px;padding:28px 24px;width:100%;max-width:400px;font-family:inherit;">
       <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#2C1A10;margin-bottom:4px;">Good morning 🥐</div>
-      <div style="font-size:13px;color:#8A7060;margin-bottom:12px;">Who are you and which day's sheet?</div>
-
-      <!-- Status shown at TOP so it's always visible -->
-      <div id="roleStatus" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500;margin-bottom:12px;text-align:center;"></div>
-
-      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:6px;">Sheet date</label>
-      <input type="text" id="roleDate" placeholder="YYYY-MM-DD" style="width:100%;padding:10px 12px;border:1.5px solid rgba(44,26,16,.15);border-radius:10px;background:#fff;font-family:inherit;font-size:14px;color:#2C1A10;margin-bottom:16px;"/>
-
-      <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:8px;">I am…</label>
-      <div style="display:grid;gap:8px;" id="roleButtonGrid">
-        <button data-role="bakery" onclick="startRole('bakery')" style="padding:14px 18px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
-          🍞 Bakery — fill Packed &amp; Loaded
-        </button>
-        <button data-role="FHK" onclick="startRole('FHK')" style="padding:14px 18px;background:#B87333;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
-          🏪 FHK — Franschhoek store
-        </button>
-        <button data-role="STB" onclick="startRole('STB')" style="padding:14px 18px;background:#4A7A5C;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
-          🏪 STB — Stellenbosch store
-        </button>
-        <button data-role="JHK" onclick="startRole('JHK')" style="padding:14px 18px;background:#3A6B8A;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
-          🏪 JHK — Jonkershoek store
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PROGRESS -->
-  <div style="padding: 0 4px 16px;">
-    <div class="progress-bar-wrap">
-      <div class="progress-bar-fill" id="progressFill"></div>
-    </div>
-    <div class="progress-label" id="progressLabel">0 of 27 products filled</div>
-  </div>
-
-  <!-- PRODUCTS -->
-  <div id="productSections"></div>
-
-  <!-- ELECTRICITY -->
-  <div class="card">
-    <div class="card-title">⚡ Electricity Units</div>
-    <div class="field-row">
-      <div class="field">
-        <label>Opening Units</label>
-        <input type="number" id="elec-open" placeholder="e.g. 1240" min="0" step="0.1" oninput="calcElec()"/>
-      </div>
-      <div class="field">
-        <label>Closing Units</label>
-        <input type="number" id="elec-close" placeholder="e.g. 1190" min="0" step="0.1" oninput="calcElec()"/>
-      </div>
-    </div>
-    <div id="elec-diff-row" style="display:none;margin-top:8px;padding:10px 12px;background:var(--cream);border-radius:10px;border:1px solid var(--border-light);">
-      <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Units Used</span>
-      <span id="elec-diff" style="float:right;font-size:15px;font-weight:700;color:var(--espresso);"></span>
-    </div>
-  </div>
-
-  <!-- NOTES -->
-  <div class="card">
-    <div class="card-title">📝 Notes</div>
-    <textarea class="notes-input" id="sheet-notes" placeholder="Any notes for the day… (optional)"></textarea>
-  </div>
-
-  <div style="height: 90px;"></div>
-</div>
-
-<!-- ACTION BUTTONS -->
-<div class="generate-wrap">
-  <div id="actionButtons" style="display:flex;flex-direction:column;gap:8px;max-width:608px;margin:0 auto;"></div>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
-<script>
-'use strict';
-
-/* ── STAGE / PREFILL ── */
-// PREFILL_DATA_START
-const PREFILL_DATA = null;
-// PREFILL_DATA_END
-
-// iOS-safe prefill: if script injection failed (regex miss on iOS), read from data attribute
-(function() {
-  try {
-    const carrier = document.getElementById('__prefill_carrier__');
-    if (carrier && carrier.dataset.json && carrier.dataset.json.length > 4) {
-      const decoded = JSON.parse(atob(carrier.dataset.json));
-      if (decoded && decoded.nextStage) {
-        window.__CARRIER_PREFILL__ = decoded;
-      }
-    }
-  } catch(e) {}
-})();
-
-/* ── PRODUCTS DATA ── */
-const PRODUCTS = [
-  // Breads
-  { id:1,  name:'Classic White',       sku:'CWS001',       emoji:'🍞', cat:'Breads' },
-  { id:2,  name:'Semolina',            sku:'SEM1',         emoji:'🍞', cat:'Breads' },
-  { id:3,  name:'Seed',                sku:'B-1WS001',     emoji:'🍞', cat:'Breads' },
-  { id:4,  name:'Olive',               sku:'OL001',        emoji:'🫒', cat:'Breads' },
-  { id:5,  name:'Ciabatta',            sku:'CIA001',       emoji:'🍞', cat:'Breads' },
-  { id:6,  name:'Rye',                 sku:'B-LR&B001',    emoji:'🍞', cat:'Breads' },
-  { id:7,  name:'Bachette',            sku:'BAG001',       emoji:'🥖', cat:'Breads' },
-  { id:8,  name:'Classic Rye',         sku:'CR002',        emoji:'🍞', cat:'Breads' },
-  { id:9,  name:'Spelt',               sku:'SL001',        emoji:'🍞', cat:'Breads' },
-  // Savoury
-  { id:10, name:'Ham Roll',            sku:'HR-BR001',     emoji:'🥐', cat:'Savoury Bakes' },
-  // Panini
-  { id:11, name:'Caprese Panino',      sku:'P-C001',       emoji:'🫓', cat:'Panini & Toasties' },
-  { id:12, name:'Aubergine Panino',    sku:'P-FESMSTP001', emoji:'🫓', cat:'Panini & Toasties' },
-  { id:13, name:'Salame Panino',       sku:'P-MSBS001',    emoji:'🫓', cat:'Panini & Toasties' },
-  { id:14, name:'Cooked Ham Panino',   sku:'P-CHACV(D001',   emoji:'🫓', cat:'Panini & Toasties' },
-  { id:15, name:'Prosciutto Panino',   sku:'P-MPBS001',    emoji:'🫓', cat:'Panini & Toasties' },
-  // Cornetti
-  { id:16, name:'Plain Cornetto',      sku:'C-P001',       emoji:'🥐', cat:'Cornetti' },
-  { id:17, name:'Almond Cornetto',     sku:'C-A001',       emoji:'🥐', cat:'Cornetti' },
-  { id:18, name:'Chocolate Fagottino', sku:'F-C002',       emoji:'🍫', cat:'Cornetti' },
-  { id:19, name:'Cruffin',             sku:'C-HPS001',     emoji:'🥐', cat:'Cornetti' },
-  { id:20, name:'Custard Raisin Swirl',sku:'CNFS001',      emoji:'🥐', cat:'Cornetti' },
-  { id:21, name:'Copenhagen',          sku:'PADC001',      emoji:'🥐', cat:'Cornetti' },
-  // Sweet
-  { id:22, name:'Cinnamon Bun - Single',sku:'CB-S001',     emoji:'🍥', cat:'Sweet Bakes' },
-  { id:23, name:'Cinnamon Bun - Mini', sku:'MCB001',       emoji:'🍥', cat:'Sweet Bakes' },
-  // Bomboloni
-  { id:24, name:'Bombolone AJ',        sku:'B-AJ001',      emoji:'🍩', cat:'Bomboloni' },
-  { id:25, name:'Bombolone LC',        sku:'B-LC001',      emoji:'🍩', cat:'Bomboloni' },
-  { id:26, name:'Bombolone MT',        sku:'10022',        emoji:'🍩', cat:'Bomboloni' },
-  { id:27, name:'Zeppola - single',         sku:'Z-S001',   emoji:'🍩', cat:'Bomboloni' },
-  // Treats
-  { id:28, name:'Muffin — Lemon Poppyseed', sku:'M-LP001',  emoji:'🧁', cat:'Treats' },
-  { id:29, name:'Muffin — Blueberry',       sku:'M-B002',   emoji:'🧁', cat:'Treats' },
-  { id:30, name:'Muffin — Breakfast',       sku:'M-B001',   emoji:'🧁', cat:'Treats' },
-  { id:31, name:'Banana Bread',             sku:'10417',    emoji:'🍌', cat:'Treats' },
-  { id:32, name:'Sbrisolina Blueberry',     sku:'SB002',    emoji:'🫐', cat:'Treats' },
-  { id:33, name:'Crostata al Caramello',    sku:'10032',    emoji:'🥧', cat:'Treats' },
-  // Pizza — store-specific
-  { id:34, name:'Pizza Balls',              sku:'PZB001',   emoji:'🍕', cat:'Pizza', stores:['JHK'] },
-  { id:35, name:'Pizza Ball Trays',         sku:'PZBT001',  emoji:'🍕', cat:'Pizza', stores:['FHK','STB'] },
-];
-
-const CATEGORIES = ['Breads','Savoury Bakes','Panini & Toasties','Cornetti','Sweet Bakes','Bomboloni','Treats','Pizza'];
-const CAT_EMOJI  = { 'Breads':'🍞', 'Savoury Bakes':'🥐', 'Panini & Toasties':'🫓', 'Cornetti':'🥐', 'Sweet Bakes':'🍥', 'Bomboloni':'🍩', 'Treats':'🧁', 'Pizza':'🍕' };
-
-const FIELDS_DEFAULT = ['Mix','Packed','Loaded','Delivered','Don','Ref','Stf','Fro'];
-const FIELDS_FHK     = ['Mix','Packed','Loaded','Delivered','Don','Stf','Fro','Bake'];
-const FIELDS_TREATS  = ['In Stock'];
-const ALL_FIELDS     = [...new Set([...FIELDS_DEFAULT, ...FIELDS_FHK, ...FIELDS_TREATS])];
-
-function getFields(p) {
-  if (p && p.cat === 'Treats') return FIELDS_TREATS;
-  return selectedStore === 'FHK' ? FIELDS_FHK : FIELDS_DEFAULT;
-}
-
-let selectedStore = 'FHK';
-const quantities = {};
-['FHK','STB','JHK'].forEach(s => {
-  quantities[s] = {};
-  PRODUCTS.forEach(p => {
-    quantities[s][p.id] = {};
-    ALL_FIELDS.forEach(f => quantities[s][p.id][f] = '');
-  });
-});
-
-/* ── GOOGLE SHEETS INTEGRATION ── */
-let currentRole  = '';  // 'bakery' | 'FHK' | 'STB' | 'JHK'
-let currentDate  = '';
-
-async function gas(params, method='GET') {
-  try {
-    if (method === 'GET') {
-      // GAS handles GET from any origin fine
-      const url = APPS_SCRIPT_URL + '?' + new URLSearchParams(params).toString();
-      const r = await fetch(url, { redirect: 'follow' });
-      return await r.json();
-    } else {
-      // FormData avoids CORS preflight — required for GAS cross-origin POST
-      const form = new FormData();
-      form.append('payload', JSON.stringify(params));
-      const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: form, redirect: 'follow' });
-      return await r.json();
-    }
-  } catch(e) {
-    throw new Error('Network error: ' + e.message);
-  }
-}
-
-// ── ROLE PICKER ──────────────────────────────────────────────
-function showRolePicker() {
-  const picker = document.getElementById('rolePicker');
-  if (!picker) return;
-  // Default date to today
-  const today = new Date();
-  const iso = today.toISOString().slice(0,10);
-  document.getElementById('roleDate').value = iso;
-  picker.style.display = 'flex';
-}
-
-// Called on page load to set default date and bind role buttons
-function initRolePicker() {
-  const today = new Date();
-  const iso = today.toISOString().slice(0,10);
-  const el = document.getElementById('roleDate');
-  if (el) el.value = iso;  // sets YYYY-MM-DD in text input
-
-  // Bind role buttons via addEventListener (more reliable than inline onclick)
-  const grid = document.getElementById('roleButtonGrid');
-  if (grid) {
-    grid.querySelectorAll('button[data-role]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        const role = btn.getAttribute('data-role');
-        startRole(role);
-      });
-    });
-  }
-}
-
-function showRoleStatus(msg, isError) {
-  var el = document.getElementById('roleStatus');
-  if (!el) return;
-  el.style.display = 'block';
-  el.style.background = isError ? '#FEE2E2' : '#F0FDF4';
-  el.style.color = isError ? '#991B1B' : '#166534';
-  el.textContent = msg;
-}
-
-async function startRole(role) {
-  var dateEl = document.getElementById('roleDate');
-  var date   = dateEl ? dateEl.value : '';
-  if (!date || date.length < 8) {
-    var t = new Date();
-    date = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
-  }
-
-  showRoleStatus('⏳ Loading from Google Sheets…', false);
-  document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = true; });
-
-  currentRole = role;
-  currentDate = date;
-
-  if (role === 'bakery') {
-    currentStage = 'bakery';
-    try {
-      var data = await gas({ action: 'loadForecast', date: date });
-      applyForecastFromGAS(data);
-      document.getElementById('sheet-date').value = date;
-      document.getElementById('rolePicker').style.display = 'none';
-      renderProducts();
-      renderActionButtons();
-      renderNameFields();
-      showToast('✅ Mix loaded for all 3 stores');
-    } catch(e) {
-      showRoleStatus('❌ ' + e.message, true);
-      document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
-    }
-  } else {
-    currentStage  = 'stores';
-    selectedStore = role;
-    document.querySelectorAll('.store-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.store === role);
-    });
-    try {
-      var data2 = await gas({ action: 'loadSheet', date: date, store: role });
-      applySheetFromGAS(data2);
-      document.getElementById('sheet-date').value = date;
-      document.getElementById('rolePicker').style.display = 'none';
-      renderProducts();
-      renderActionButtons();
-      renderNameFields();
-      showToast('✅ Sheet loaded for ' + role);
-    } catch(e) {
-      showRoleStatus('❌ ' + e.message, true);
-      document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
-    }
-  }
-}
-
-function applyForecastFromGAS(data) {
-  // data.entries = [{store, sku, mix}]
-  const STORES = ['FHK','STB','JHK'];
-  STORES.forEach(store => {
-    PRODUCTS.forEach(p => {
-      const entry = data.entries.find(e => e.store === store && e.sku === p.sku);
-      if (entry && entry.mix !== '' && entry.mix !== undefined) {
-        quantities[store][p.id]['Mix'] = String(entry.mix);
-      }
-    });
-  });
-}
-
-function applySheetFromGAS(data) {
-  // data.entries = [{ProductID, SKU, Mix, Packed, Loaded, ...}]
-  // Lock Mix, Packed, Loaded — store fills the rest
-  const store = data.store;
-  data.entries.forEach(entry => {
-    const p = PRODUCTS.find(pr => String(pr.id) === String(entry.ProductID) || pr.sku === entry.SKU);
-    if (!p) return;
-    const fields = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake','InStock'];
-    fields.forEach(f => {
-      if (entry[f] !== undefined && entry[f] !== '') {
-        quantities[store][p.id][f] = String(entry[f]);
-      }
-    });
-  });
-  // Apply names from meta
-  if (data.meta) {
-    const m = data.meta;
-    if (m.ForecastBy) names.forecast = m.ForecastBy;
-    if (m.MixedBy)    names.mix      = m.MixedBy;
-    if (m.PackedBy)   names.packed   = m.PackedBy;
-    if (m.LoadedBy)   names.loaded   = m.LoadedBy;
-    if (m.ElecOpen)   document.getElementById('elec-open').value  = m.ElecOpen;
-    if (m.ElecClose)  document.getElementById('elec-close').value = m.ElecClose;
-  }
-}
-
-// ── SAVE ─────────────────────────────────────────────────────
-async function saveToSheets() {
-  if (!validateCurrentName()) {
-    if (currentRole === 'bakery') showToast('⚠️ Enter Mixed by, Packed by and Loaded by');
-    else showToast('⚠️ Enter your name');
-    return;
-  }
-  getNamesSnapshot();
-
-  const btn = document.getElementById('saveBtn');
-  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
-
-  try {
-    if (currentRole === 'bakery') {
-      // Save Packed + Loaded for all 3 stores
-      const data = {};
-      ['FHK','STB','JHK'].forEach(store => {
-        data[store] = {};
-        PRODUCTS.forEach(p => {
-          if (p.cat === 'Treats') return;
-          data[store][p.id] = {
-            Packed: quantities[store][p.id]['Packed'] || '',
-            Loaded: quantities[store][p.id]['Loaded'] || '',
-          };
-        });
-      });
-      await gas({ action: 'saveBakery', date: currentDate, data, names }, 'POST');
-      showToast('✅ Saved to Google Sheets');
-
-    } else {
-      // Store: save received columns for this store
-      const store = currentRole;
-      const data  = {};
-      PRODUCTS.forEach(p => {
-        const storeFields = store === 'FHK'
-          ? ['Received','Don','Stf','Fro','Bake','InStock']
-          : ['Received','Don','Ref','Stf','Fro','InStock'];
-        const entry = {};
-        storeFields.forEach(f => entry[f] = quantities[store][p.id][f] || '');
-        data[p.id] = entry;
-      });
-      const elec = {
-        open:  document.getElementById('elec-open').value,
-        close: document.getElementById('elec-close').value,
-        notes: document.getElementById('sheet-notes').value,
-      };
-      await gas({ action: 'saveStore', date: currentDate, store, data, names, elec }, 'POST');
-      showToast('✅ Saved to Google Sheets');
-    }
-  } catch(e) {
-    showToast('❌ Save failed: ' + e.message);
-  } finally {
-    if (btn) { btn.textContent = '💾 Save'; btn.disabled = false; }
-  }
-}a name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-  <title>Mother Dough · Opening Stock</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --cream:        #FAF6F0;
-      --cream-dark:   #F0E9DE;
-      --cream-mid:    #E8DDD1;
-      --espresso:     #2C1A10;
-      --espresso-mid: #4A2C1A;
-      --amber:        #B87333;
-      --amber-light:  #D4924A;
-      --amber-glow:   #F0C070;
-      --sage:         #5A7A5C;
-      --rust:         #B85A3A;
-      --wheat:        #C8A87A;
-      --text-primary: #2C1A10;
-      --text-secondary: #6B4E3A;
-      --text-muted:   #9A7A68;
-      --border:       #DDD0C0;
-      --border-light: #EEE4D8;
-      --shadow-sm:    0 2px 8px rgba(44,26,16,0.07);
-      --shadow-md:    0 6px 24px rgba(44,26,16,0.10);
-      --font-display: 'Playfair Display', Georgia, serif;
-      --font-body:    'DM Sans', system-ui, sans-serif;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: var(--font-body);
-      background: var(--cream);
-      color: var(--text-primary);
-      min-height: 100vh;
-      font-size: 15px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(200,163,122,0.15) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 60% at 90% 90%, rgba(184,115,51,0.08) 0%, transparent 55%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .app {
-      position: relative;
-      z-index: 1;
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 0 16px 80px;
-    }
-
-    /* ── HEADER ── */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 24px 0 20px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
-    }
-
-    .logo {
-      width: 42px;
-      height: 42px;
-      background: var(--espresso);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      flex-shrink: 0;
-    }
-
-    .header-text h1 {
-      font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--espresso);
-      line-height: 1.2;
-    }
-
-    .header-text p {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 400;
-    }
-
-    /* ── SECTION CARDS ── */
-    .card {
-      background: white;
-      border-radius: 16px;
-      border: 1px solid var(--border-light);
-      box-shadow: var(--shadow-sm);
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-
-    .card-title {
-      font-family: var(--font-display);
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--espresso);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border-light);
-    }
-
-    /* ── FORM FIELDS ── */
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
-    .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
-    .field-row.full  { grid-template-columns: 1fr; }
-
-    .field-row.full { grid-template-columns: 1fr; }
-    .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
-
-    .field label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
-    }
-
-    .field input,
-    .field select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      background: var(--cream);
-      font-family: var(--font-body);
-      font-size: 14px;
-      color: var(--text-primary);
-      appearance: none;
-      -webkit-appearance: none;
-      transition: border-color 0.18s, box-shadow 0.18s;
-      outline: none;
-    }
-
-    .field input:focus,
-    .field select:focus {
-      border-color: var(--amber);
-      box-shadow: 0 0 0 3px rgba(184,115,51,0.12);
-      background: white;
-    }
-
-    .field select {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239A7A68' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
-      padding-right: 32px;
-    }
-
-    /* ── STORE TOGGLE ── */
-    .store-toggle {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 4px;
-    }
-
-    .store-btn {
-      padding: 10px 6px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      background: var(--cream);
-      cursor: pointer;
-      text-align: center;
-      font-family: var(--font-body);
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      transition: all 0.15s;
-      line-height: 1.3;
-    }
-
-    .store-btn .store-code { font-size: 15px; font-weight: 700; display: block; }
-    .store-btn .store-name { font-size: 10px; font-weight: 400; color: var(--text-muted); display: block; }
-
-    .store-btn.active {
-      border-color: var(--espresso);
-      background: var(--espresso);
-      color: white;
-    }
-
-    .store-btn.active .store-name { color: var(--wheat); }
-
-    /* ── PRODUCT CATEGORIES ── */
-    .cat-section { margin-bottom: 8px; }
-
-    .cat-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: linear-gradient(135deg, var(--espresso) 0%, var(--espresso-mid) 100%);
-      border-radius: 10px 10px 0 0;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .cat-header-text {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 600;
-      color: white;
-      letter-spacing: 0.04em;
-      flex: 1;
-    }
-
-    .cat-count {
-      font-size: 11px;
-      color: var(--amber-glow);
-      font-weight: 600;
-    }
-
-    .cat-chevron {
-      font-size: 10px;
-      color: var(--wheat);
-      transition: transform 0.2s;
-    }
-
-    .cat-header.collapsed .cat-chevron { transform: rotate(-90deg); }
-
-    .cat-body {
-      background: white;
-      border: 1px solid var(--border-light);
-      border-top: none;
-      border-radius: 0 0 10px 10px;
-      overflow: hidden;
-    }
-
-    .cat-body.hidden { display: none; }
-
-    .product-row {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-light);
-      transition: background 0.1s;
-    }
-
-    .product-row:last-child { border-bottom: none; }
-    .product-row:hover { background: #FDFBF8; }
-
-    .product-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .product-emoji { font-size: 16px; flex-shrink: 0; }
-
-    .product-name {
-      flex: 1;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-      line-height: 1.3;
-    }
-
-    .product-sku {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 400;
-    }
-
-    .fields-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
-    }
-
-    .field-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 3px;
-    }
-
-    .field-cell label {
-      font-size: 9px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .field-cell input {
-      width: 100%;
-      height: 34px;
-      border: 1.5px solid var(--border);
-      border-radius: 7px;
-      background: var(--cream);
-      text-align: center;
-      font-family: var(--font-body);
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-      outline: none;
-      -moz-appearance: textfield;
-      transition: border-color 0.15s, background 0.15s;
-      padding: 0;
-    }
-
-    .field-cell input::-webkit-inner-spin-button,
-    .field-cell input::-webkit-outer-spin-button { -webkit-appearance: none; }
-
-    .field-cell input:focus {
-      border-color: var(--amber);
-      background: white;
-    }
-
-    .mismatch-flag {
-      display: none;
-      margin-top: 6px;
-      padding: 5px 10px;
-      background: rgba(184,115,51,0.1);
-      border: 1px solid rgba(184,115,51,0.35);
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--amber);
-      line-height: 1.4;
-    }
-    .mismatch-flag.visible { display: block; }
-    .mismatch-flag .mf-item { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
-    .mismatch-flag .mf-icon { font-size: 13px; }
-
-    .field-cell input.mismatch-hi {
-      border-color: var(--amber) !important;
-      background: rgba(184,115,51,0.07) !important;
-    }
-
-    .field-cell input.has-value {
-      border-color: var(--sage);
-      background: rgba(90,122,92,0.06);
-      color: var(--sage);
-    }
-
-    /* ── NOTES ── */
-    .notes-input {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      background: var(--cream);
-      font-family: var(--font-body);
-      font-size: 14px;
-      color: var(--text-primary);
-      resize: none;
-      outline: none;
-      transition: border-color 0.18s, box-shadow 0.18s;
-      min-height: 72px;
-    }
-
-    .notes-input:focus {
-      border-color: var(--amber);
-      box-shadow: 0 0 0 3px rgba(184,115,51,0.12);
-      background: white;
-    }
-
-    /* ── PROGRESS ── */
-    .progress-bar-wrap {
-      background: var(--cream-mid);
-      border-radius: 99px;
-      height: 6px;
-      margin-bottom: 6px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--sage) 0%, var(--amber) 100%);
-      border-radius: 99px;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      width: 0%;
-    }
-
-    .progress-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: right;
-    }
-
-    /* ── GENERATE BUTTON ── */
-    .generate-wrap {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 14px 16px 24px;
-      background: linear-gradient(to top, var(--cream) 70%, transparent);
-      z-index: 100;
-    }
-
-    .generate-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      width: 100%;
-      max-width: 608px;
-      margin: 0 auto;
-      padding: 16px 24px;
-      background: var(--espresso);
-      color: white;
-      border: none;
-      border-radius: 14px;
-      font-family: var(--font-body);
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 20px rgba(44,26,16,0.25);
-      transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
-    }
-
-    .generate-btn:active {
-      transform: scale(0.98);
-      box-shadow: 0 2px 10px rgba(44,26,16,0.20);
-    }
-
-    .generate-btn:disabled {
-      background: var(--text-muted);
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
-    .generate-btn .btn-icon { font-size: 18px; }
-
-    /* ── TOAST ── */
-    .toast {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-80px);
-      background: var(--espresso);
-      color: white;
-      padding: 12px 20px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 500;
-      box-shadow: var(--shadow-md);
-      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      z-index: 9999;
-      white-space: nowrap;
-    }
-
-    .toast.show { transform: translateX(-50%) translateY(0); }
-
-    /* ── STATUS DOTS ── */
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--border);
-      flex-shrink: 0;
-    }
-
-    .status-dot.filled { background: var(--sage); }
-
-    @media (max-width: 400px) {
-      .product-name { font-size: 13px; }
-    }
-  </style>
-</head>
-<body>
-<div id="__prefill_carrier__" data-json="" style="display:none;"></div>
-
-<div class="app">
-
-  <!-- HEADER -->
-  <div class="header">
-    <div class="logo">🥐</div>
-    <div class="header-text">
-      <h1>Mother Dough</h1>
-      <p>Opening Stock Sheet</p>
-    </div>
-  </div>
-
-  <!-- META CARD -->
-  <div class="card">
-    <div class="card-title">📋 Sheet Details</div>
-
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Store</div>
-      <div class="store-toggle">
-        <button class="store-btn active" data-store="FHK" onclick="setStore('FHK',this)">
-          <span class="store-code">FHK</span>
-          <span class="store-name">Franschhoek</span>
-        </button>
-        <button class="store-btn" data-store="STB" onclick="setStore('STB',this)">
-          <span class="store-code">STB</span>
-          <span class="store-name">Stellenbosch</span>
-        </button>
-        <button class="store-btn" data-store="JHK" onclick="setStore('JHK',this)">
-          <span class="store-code">JHK</span>
-          <span class="store-name">Jonkershoek</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="field-row">
-      <div class="field">
-        <label>Date</label>
-        <input type="date" id="sheet-date"/>
-      </div>
-    </div>
-
-    <!-- Stage-specific name fields — shown/hidden by renderNameFields() -->
-    <div id="nameFieldsWrap"></div>
-  </div>
-
-  <!-- LOAD FORECAST -->
-  <!-- Role picker shown on first open — covers whole screen -->
-  <div id="rolePicker" style="display:none;position:fixed;inset:0;background:rgba(28,20,16,0.85);z-index:9000;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:#FAF7F2;border-radius:20px;padding:28px 24px;width:100%;max-width:400px;font-family:inherit;">
-      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#2C1A10;margin-bottom:4px;">Good morning 🥐</div>
       <div style="font-size:13px;color:#8A7060;margin-bottom:20px;">Who are you and which day's sheet?</div>
 
       <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:6px;">Sheet date</label>
       <input type="date" id="roleDate" style="width:100%;padding:10px 12px;border:1.5px solid rgba(44,26,16,.15);border-radius:10px;background:#fff;font-family:inherit;font-size:14px;color:#2C1A10;margin-bottom:16px;"/>
 
       <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:8px;">I am…</label>
-      <div style="display:grid;gap:8px;">
+      <div style="display:grid;gap:8px;" id="roleButtonGrid">
         <button onclick="startRole('bakery')" style="padding:14px 18px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🍞 Bakery — fill Packed &amp; Loaded
         </button>
@@ -1695,6 +783,177 @@ function decodeSnapshot(hash) {
 // Paste your Google Apps Script Web App URL here after deploying
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxj3O8z3r05PNM1wDCDD-_ytUZ1n3g_31-DM0HwHehgLqHF4FsW97DcUTdBlGkRLTL/exec';
 // ────────────────────────────────────────────────────────────────
+
+
+/* ── GOOGLE SHEETS ROLE PICKER ── */
+var currentRole = '';
+var currentDate = '';
+
+function showRoleStatus(msg, isError) {
+  var el = document.getElementById('roleStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.background = isError ? '#FEE2E2' : '#F0FDF4';
+  el.style.color      = isError ? '#991B1B' : '#166534';
+  el.textContent      = msg;
+}
+
+function startRole(role) {
+  try {
+    var dateEl = document.getElementById('roleDate');
+    var date   = dateEl ? dateEl.value : '';
+    if (!date || date.length < 8) {
+      var t = new Date();
+      date  = t.getFullYear() + '-' +
+              String(t.getMonth() + 1).padStart(2, '0') + '-' +
+              String(t.getDate()).padStart(2, '0');
+    }
+
+    showRoleStatus('⏳ Connecting to Google Sheets…', false);
+    document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = true; });
+
+    currentRole = role;
+    currentDate = date;
+
+    if (role === 'bakery') {
+      currentStage = 'bakery';
+      fetch(APPS_SCRIPT_URL + '?action=loadForecast&date=' + encodeURIComponent(date))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          applyForecastFromGAS(d);
+          document.getElementById('sheet-date').value = date;
+          document.getElementById('rolePicker').style.display = 'none';
+          renderProducts(); renderActionButtons(); renderNameFields();
+          showToast('✅ Mix loaded for all 3 stores');
+        })
+        .catch(function(e) {
+          showRoleStatus('❌ ' + e.message, true);
+          document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
+        });
+    } else {
+      currentStage  = 'stores';
+      selectedStore = role;
+      fetch(APPS_SCRIPT_URL + '?action=loadSheet&date=' + encodeURIComponent(date) + '&store=' + encodeURIComponent(role))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          applySheetFromGAS(d);
+          document.getElementById('sheet-date').value = date;
+          document.getElementById('rolePicker').style.display = 'none';
+          renderProducts(); renderActionButtons(); renderNameFields();
+          showToast('✅ Sheet loaded for ' + role);
+        })
+        .catch(function(e) {
+          showRoleStatus('❌ ' + e.message, true);
+          document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
+        });
+    }
+  } catch(err) {
+    showRoleStatus('❌ Unexpected error: ' + err.message, true);
+    document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
+  }
+}
+
+function applyForecastFromGAS(data) {
+  var STORES = ['FHK', 'STB', 'JHK'];
+  if (!data || !data.entries) return;
+  STORES.forEach(function(store) {
+    PRODUCTS.forEach(function(p) {
+      var entry = data.entries.find(function(e) { return e.store === store && String(e.sku) === String(p.sku); });
+      if (entry && entry.mix !== '' && entry.mix !== undefined && entry.mix !== null) {
+        quantities[store][p.id]['Mix'] = String(entry.mix);
+      }
+    });
+  });
+}
+
+function applySheetFromGAS(data) {
+  if (!data || !data.entries) return;
+  var store  = data.store;
+  var fields = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake','InStock'];
+  data.entries.forEach(function(entry) {
+    var p = PRODUCTS.find(function(pr) { return String(pr.id) === String(entry.ProductID) || String(pr.sku) === String(entry.SKU); });
+    if (!p) return;
+    fields.forEach(function(f) {
+      if (entry[f] !== undefined && entry[f] !== null && String(entry[f]) !== '') {
+        quantities[store][p.id][f] = String(entry[f]);
+      }
+    });
+  });
+  if (data.meta) {
+    var m = data.meta;
+    if (m.ForecastBy) names.forecast = String(m.ForecastBy);
+    if (m.MixedBy)    names.mix      = String(m.MixedBy);
+    if (m.PackedBy)   names.packed   = String(m.PackedBy);
+    if (m.LoadedBy)   names.loaded   = String(m.LoadedBy);
+  }
+}
+
+async function saveToSheets() {
+  if (!currentRole || !currentDate) { showToast('⚠️ No role selected'); return; }
+  if (!validateCurrentName()) {
+    if (currentRole === 'bakery') showToast('⚠️ Enter Mixed by, Packed by and Loaded by');
+    else showToast('⚠️ Enter your name');
+    return;
+  }
+  getNamesSnapshot();
+  var btn = document.getElementById('saveBtn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  try {
+    var payload;
+    if (currentRole === 'bakery') {
+      var data = {};
+      ['FHK','STB','JHK'].forEach(function(store) {
+        data[store] = {};
+        PRODUCTS.forEach(function(p) {
+          if (p.cat === 'Treats') return;
+          data[store][p.id] = {
+            Packed: quantities[store][p.id]['Packed'] || '',
+            Loaded: quantities[store][p.id]['Loaded'] || ''
+          };
+        });
+      });
+      payload = { action: 'saveBakery', date: currentDate, data: data, names: names };
+    } else {
+      var store = currentRole;
+      var storeData = {};
+      PRODUCTS.forEach(function(p) {
+        var sf = store === 'FHK'
+          ? ['Received','Don','Stf','Fro','Bake','InStock']
+          : ['Received','Don','Ref','Stf','Fro','InStock'];
+        var entry = {};
+        sf.forEach(function(f) { entry[f] = quantities[store][p.id][f] || ''; });
+        storeData[p.id] = entry;
+      });
+      var elec = {
+        open:  document.getElementById('elec-open').value,
+        close: document.getElementById('elec-close').value,
+        notes: document.getElementById('sheet-notes').value
+      };
+      payload = { action: 'saveStore', date: currentDate, store: store, data: storeData, names: names, elec: elec };
+    }
+
+    var form = new FormData();
+    form.append('payload', JSON.stringify(payload));
+    var r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: form });
+    var result = await r.json();
+    if (result.error) throw new Error(result.error);
+    showToast('✅ Saved to Google Sheets');
+  } catch(e) {
+    showToast('❌ Save failed: ' + e.message);
+  } finally {
+    if (btn) { btn.textContent = '💾 Save to Google Sheets'; btn.disabled = false; }
+  }
+}
+/* ── END GOOGLE SHEETS ROLE PICKER ── */
+function initRolePicker() {
+  var today = new Date();
+  var iso   = today.getFullYear() + '-' +
+              String(today.getMonth() + 1).padStart(2, '0') + '-' +
+              String(today.getDate()).padStart(2, '0');
+  var el = document.getElementById('roleDate');
+  if (el) el.value = iso;
+}
 
 /* ── INIT ── */
 /* ── STAGE SYSTEM ── */
