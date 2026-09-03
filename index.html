@@ -541,7 +541,7 @@
 
   <!-- LOAD FORECAST -->
   <!-- Role picker shown on first open — covers whole screen -->
-  <div id="rolePicker" style="display:none;position:fixed;inset:0;background:rgba(28,20,16,0.85);z-index:9000;align-items:center;justify-content:center;padding:20px;">
+  <div id="rolePicker" style="display:flex;position:fixed;inset:0;background:rgba(28,20,16,0.85);z-index:9000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:#FAF7F2;border-radius:20px;padding:28px 24px;width:100%;max-width:400px;font-family:inherit;">
       <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#2C1A10;margin-bottom:4px;">Good morning 🥐</div>
       <div style="font-size:13px;color:#8A7060;margin-bottom:20px;">Who are you and which day's sheet?</div>
@@ -731,6 +731,14 @@ function showRolePicker() {
   const iso = today.toISOString().slice(0,10);
   document.getElementById('roleDate').value = iso;
   picker.style.display = 'flex';
+}
+
+// Called on page load to set default date in picker
+function initRolePicker() {
+  const today = new Date();
+  const iso = today.toISOString().slice(0,10);
+  const el = document.getElementById('roleDate');
+  if (el) el.value = iso;
 }
 
 async function startRole(role) {
@@ -1680,8 +1688,8 @@ function init() {
   const todayISO = `${y}-${m}-${d}`;
   document.getElementById('sheet-date').value = todayISO;
 
-  // Google Sheets flow: show role picker immediately
-  showRolePicker();
+  // Google Sheets flow: role picker is shown by default (display:flex in HTML)
+  initRolePicker(); // set today's date in picker
 
   // Legacy URL hash check kept for backward compat
   // Primary: check URL hash for stage data (works on ALL platforms via Netlify URL)
