@@ -544,27 +544,29 @@
   <div id="rolePicker" style="display:flex;position:fixed;inset:0;background:rgba(28,20,16,0.85);z-index:9000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:#FAF7F2;border-radius:20px;padding:28px 24px;width:100%;max-width:400px;font-family:inherit;">
       <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#2C1A10;margin-bottom:4px;">Good morning 🥐</div>
-      <div style="font-size:13px;color:#8A7060;margin-bottom:20px;">Who are you and which day's sheet?</div>
+      <div style="font-size:13px;color:#8A7060;margin-bottom:12px;">Who are you and which day's sheet?</div>
+
+      <!-- Status shown at TOP so it's always visible -->
+      <div id="roleStatus" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500;margin-bottom:12px;text-align:center;"></div>
 
       <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:6px;">Sheet date</label>
-      <input type="date" id="roleDate" style="width:100%;padding:10px 12px;border:1.5px solid rgba(44,26,16,.15);border-radius:10px;background:#fff;font-family:inherit;font-size:14px;color:#2C1A10;margin-bottom:16px;"/>
+      <input type="text" id="roleDate" placeholder="YYYY-MM-DD" style="width:100%;padding:10px 12px;border:1.5px solid rgba(44,26,16,.15);border-radius:10px;background:#fff;font-family:inherit;font-size:14px;color:#2C1A10;margin-bottom:16px;"/>
 
       <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#8A7060;display:block;margin-bottom:8px;">I am…</label>
-      <div style="display:grid;gap:8px;">
-        <button onclick="startRole('bakery')" style="padding:14px 18px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+      <div style="display:grid;gap:8px;" id="roleButtonGrid">
+        <button data-role="bakery" onclick="startRole('bakery')" style="padding:14px 18px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🍞 Bakery — fill Packed &amp; Loaded
         </button>
-        <button onclick="startRole('FHK')" style="padding:14px 18px;background:#B87333;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+        <button data-role="FHK" onclick="startRole('FHK')" style="padding:14px 18px;background:#B87333;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🏪 FHK — Franschhoek store
         </button>
-        <button onclick="startRole('STB')" style="padding:14px 18px;background:#4A7A5C;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+        <button data-role="STB" onclick="startRole('STB')" style="padding:14px 18px;background:#4A7A5C;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🏪 STB — Stellenbosch store
         </button>
-        <button onclick="startRole('JHK')" style="padding:14px 18px;background:#3A6B8A;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+        <button data-role="JHK" onclick="startRole('JHK')" style="padding:14px 18px;background:#3A6B8A;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🏪 JHK — Jonkershoek store
         </button>
       </div>
-      <div id="roleStatus" style="margin-top:12px;font-size:12px;color:#8A7060;text-align:center;"></div>
     </div>
   </div>
 
@@ -740,32 +742,52 @@ function showRolePicker() {
   picker.style.display = 'flex';
 }
 
-// Called on page load to set default date in picker
+// Called on page load to set default date and bind role buttons
 function initRolePicker() {
   const today = new Date();
   const iso = today.toISOString().slice(0,10);
   const el = document.getElementById('roleDate');
-  if (el) el.value = iso;
+  if (el) el.value = iso;  // sets YYYY-MM-DD in text input
+
+  // Bind role buttons via addEventListener (more reliable than inline onclick)
+  const grid = document.getElementById('roleButtonGrid');
+  if (grid) {
+    grid.querySelectorAll('button[data-role]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const role = btn.getAttribute('data-role');
+        startRole(role);
+      });
+    });
+  }
+}
+
+function showRoleStatus(msg, isError) {
+  var el = document.getElementById('roleStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.background = isError ? '#FEE2E2' : '#F0FDF4';
+  el.style.color = isError ? '#991B1B' : '#166534';
+  el.textContent = msg;
 }
 
 async function startRole(role) {
-  const date = document.getElementById('roleDate').value;
-  if (!date) { document.getElementById('roleStatus').textContent = '⚠️ Please pick a date'; return; }
-  const statusEl = document.getElementById('roleStatus');
-  statusEl.style.color = '#8A7060';
-  statusEl.textContent = '⏳ Loading from Google Sheets…';
-  // Disable buttons while loading
-  document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = true);
+  var dateEl = document.getElementById('roleDate');
+  var date   = dateEl ? dateEl.value : '';
+  if (!date || date.length < 8) {
+    var t = new Date();
+    date = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  }
+
+  showRoleStatus('⏳ Loading from Google Sheets…', false);
+  document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = true; });
 
   currentRole = role;
   currentDate = date;
 
-  // Set stage based on role
   if (role === 'bakery') {
     currentStage = 'bakery';
-    // Bakery selects all 3 stores — load Mix for all 3
     try {
-      const data = await gas({ action: 'loadForecast', date });
+      var data = await gas({ action: 'loadForecast', date: date });
       applyForecastFromGAS(data);
       document.getElementById('sheet-date').value = date;
       document.getElementById('rolePicker').style.display = 'none';
@@ -774,19 +796,18 @@ async function startRole(role) {
       renderNameFields();
       showToast('✅ Mix loaded for all 3 stores');
     } catch(e) {
-      statusEl.style.color = '#C44A2A';
-      statusEl.textContent = '❌ ' + e.message;
-      document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = false);
+      showRoleStatus('❌ ' + e.message, true);
+      document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
     }
   } else {
-    // Store role: FHK, STB, JHK
     currentStage  = 'stores';
     selectedStore = role;
-    document.querySelectorAll('.store-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.store === role));
+    document.querySelectorAll('.store-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.store === role);
+    });
     try {
-      const data = await gas({ action: 'loadSheet', date, store: role });
-      applySheetFromGAS(data);
+      var data2 = await gas({ action: 'loadSheet', date: date, store: role });
+      applySheetFromGAS(data2);
       document.getElementById('sheet-date').value = date;
       document.getElementById('rolePicker').style.display = 'none';
       renderProducts();
@@ -794,9 +815,8 @@ async function startRole(role) {
       renderNameFields();
       showToast('✅ Sheet loaded for ' + role);
     } catch(e) {
-      statusEl.style.color = '#C44A2A';
-      statusEl.textContent = '❌ ' + e.message;
-      document.querySelectorAll('#rolePicker button').forEach(b => b.disabled = false);
+      showRoleStatus('❌ ' + e.message, true);
+      document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
     }
   }
 }
