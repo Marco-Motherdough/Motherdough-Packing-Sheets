@@ -836,11 +836,11 @@ function startRole(role) {
       fetch(APPS_SCRIPT_URL + '?action=loadSheet&date=' + encodeURIComponent(date) + '&store=' + encodeURIComponent(role))
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          applySheetFromGAS(d);
+          var cnt = applySheetFromGAS(d);
           document.getElementById('sheet-date').value = date;
           document.getElementById('rolePicker').style.display = 'none';
           renderProducts(); renderActionButtons(); renderNameFields();
-          showToast('✅ Sheet loaded for ' + role);
+          showToast('✅ ' + role + ': ' + (d.entries ? d.entries.length : 0) + ' rows, ' + cnt + ' fields filled');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -867,15 +867,24 @@ function applyForecastFromGAS(data) {
 }
 
 function applySheetFromGAS(data) {
-  if (!data || !data.entries) return;
-  var store  = data.store;
-  var fields = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake','InStock'];
+  if (!data || !data.entries) {
+    showToast('⚠️ No data returned from Google Sheets');
+    return 0;
+  }
+  var store   = data.store;
+  var fields  = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake','InStock'];
+  var matched = 0;
+  var skipped = [];
   data.entries.forEach(function(entry) {
-    var p = PRODUCTS.find(function(pr) { return String(pr.id) === String(entry.ProductID) || String(pr.sku) === String(entry.SKU); });
-    if (!p) return;
+    var p = PRODUCTS.find(function(pr) {
+      return String(pr.id)  === String(entry.ProductID) ||
+             String(pr.sku) === String(entry.SKU);
+    });
+    if (!p) { skipped.push(String(entry.ProductID) + '/' + String(entry.SKU)); return; }
     fields.forEach(function(f) {
       if (entry[f] !== undefined && entry[f] !== null && String(entry[f]) !== '') {
         quantities[store][p.id][f] = String(entry[f]);
+        matched++;
       }
     });
   });
@@ -886,6 +895,7 @@ function applySheetFromGAS(data) {
     if (m.PackedBy)   names.packed   = String(m.PackedBy);
     if (m.LoadedBy)   names.loaded   = String(m.LoadedBy);
   }
+  return matched;
 }
 
 async function saveToSheets() {
