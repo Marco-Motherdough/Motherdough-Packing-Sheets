@@ -1713,8 +1713,28 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
 
   // ── FILENAME ──
   const fname = `MotherDough-OpeningStock-${selectedStore}-${dateVal}.pdf`;
-  doc.save(fname);
-  showToast('✅ PDF saved — share on the group!');
+  // Use Web Share API on iOS (shares actual PDF file to WhatsApp etc)
+  // Fall back to download on desktop/Android
+  const pdfBlob = doc.output('blob');
+  const pdfFile = new File([pdfBlob], fname, { type: 'application/pdf' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    navigator.share({ files: [pdfFile], title: fname })
+      .then(() => showToast('✅ PDF shared!'))
+      .catch(() => {
+        // User cancelled or share failed — fall back to download
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
+        URL.revokeObjectURL(url);
+        showToast('✅ PDF saved — share on the group!');
+      });
+  } else {
+    // Desktop / Android — trigger download
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
+    URL.revokeObjectURL(url);
+    showToast('✅ PDF saved — share on the group!');
+  }
 }
 
 function drawFooter(doc, PW, PH, ML, MR) {
