@@ -598,6 +598,21 @@
     </div>
   </div>
 
+  <!-- DRIVER -->
+  <div class="card">
+    <div class="card-title">🚗 Driver</div>
+    <div class="field-row">
+      <div class="field">
+        <label>Arrival Time</label>
+        <input type="time" id="driver-arrived" placeholder="e.g. 07:30"/>
+      </div>
+      <div class="field">
+        <label>Departure Time</label>
+        <input type="time" id="driver-left" placeholder="e.g. 08:15"/>
+      </div>
+    </div>
+  </div>
+
   <!-- NOTES -->
   <div class="card">
     <div class="card-title">📝 Notes</div>
@@ -936,9 +951,11 @@ async function saveToSheets() {
         storeData[p.id] = entry;
       });
       var elec = {
-        open:  document.getElementById('elec-open').value,
-        close: document.getElementById('elec-close').value,
-        notes: document.getElementById('sheet-notes').value
+        open:    document.getElementById('elec-open').value,
+        close:   document.getElementById('elec-close').value,
+        notes:   document.getElementById('sheet-notes').value,
+        driverArrived: (document.getElementById('driver-arrived') || {}).value || '',
+        driverLeft:    (document.getElementById('driver-left')    || {}).value || ''
       };
       payload = { action: 'saveStore', date: currentDate, store: store, data: storeData, names: names, elec: elec };
     }
@@ -1385,60 +1402,15 @@ function exportStage(nextStage) {
   showToast('Use the Save button instead');
 }
 
-function showShareModal(stageLabel, url, dateVal) {
-  const existing = document.getElementById('shareModal');
-  if (existing) existing.remove();
 
-  const modal = document.createElement('div');
-  modal.id = 'shareModal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(28,20,16,0.78);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:0;';
-
-  modal.innerHTML = `
-    <div style="background:#FAF7F2;border-radius:20px 20px 0 0;padding:28px 22px 44px;width:100%;max-width:520px;font-family:inherit;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#B87333;margin-bottom:8px;">✅ Ready to send to ${stageLabel}</div>
-      <div style="font-size:16px;font-weight:600;color:#2C1A10;margin-bottom:6px;line-height:1.4;">Copy this link and paste into WhatsApp</div>
-      <div style="font-size:12px;color:#8A7060;margin-bottom:14px;line-height:1.5;">
-        When tapped in WhatsApp, this opens directly in Safari on any device.<br>
-        <strong style="color:#2C1A10;">No files, no installs — just tap the link.</strong>
-      </div>
-      <div style="background:#2C1A10;border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:#E8C07A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;"
-          onclick="this.parentElement.querySelector('button').click()">${url.slice(0,60)}…</div>
-        <button id="copyBtn" onclick="
-          navigator.clipboard.writeText('${url}')
-            .then(() => {
-              this.textContent = '✓ Copied';
-              this.style.background = '#4A7A5C';
-              setTimeout(() => { this.textContent = 'Copy'; this.style.background = ''; }, 2500);
-            })
-            .catch(() => {
-              const ta = document.createElement('textarea');
-              ta.value = '${url}';
-              document.body.appendChild(ta);
-              ta.select(); document.execCommand('copy');
-              document.body.removeChild(ta);
-              this.textContent = '✓ Copied';
-              this.style.background = '#4A7A5C';
-              setTimeout(() => { this.textContent = 'Copy'; this.style.background = ''; }, 2500);
-            });
-        " style="flex-shrink:0;background:#B87333;color:white;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Copy</button>
-      </div>
-      <div style="font-size:11px;color:#AFA090;margin-bottom:20px;">
-        ⚠️ First time? Upload the stock sheet to <strong>netlify.com/drop</strong> — takes 30 seconds, free forever.
-      </div>
-      <button onclick="document.getElementById('shareModal').remove()" 
-        style="width:100%;padding:15px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;">Done</button>
-    </div>`;
-
-  document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-}
 
 function generatePDF() {
-  const dateVal  = document.getElementById('sheet-date').value;
-  const notesVal = document.getElementById('sheet-notes').value.trim();
-  const elecOpen  = document.getElementById('elec-open').value.trim();
-  const elecClose = document.getElementById('elec-close').value.trim();
+  const dateVal       = document.getElementById('sheet-date').value;
+  const notesVal      = document.getElementById('sheet-notes').value.trim();
+  const elecOpen      = document.getElementById('elec-open').value.trim();
+  const elecClose     = document.getElementById('elec-close').value.trim();
+  const driverArrived = document.getElementById('driver-arrived').value.trim();
+  const driverLeft    = document.getElementById('driver-left').value.trim();
   getNamesSnapshot();
 
   if (!dateVal) { showToast('⚠️ Please select a date'); return; }
@@ -1455,14 +1427,14 @@ function generatePDF() {
   });
 
   loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-    .then(() => buildPDF(dateVal, names, notesVal, elecOpen, elecClose))
+    .then(() => buildPDF(dateVal, names, notesVal, elecOpen, elecClose, driverArrived, driverLeft))
     .catch(err => { showToast('❌ Could not load PDF library'); console.error(err); })
     .finally(() => {
       if (btn) { btn.disabled = false; btn.innerHTML = '<span style="font-size:18px;">📄</span> Generate & Download PDF'; }
     });
 }
 
-function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose) {
+function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrived, driverLeft) {
   const { jsPDF } = window.jspdf;
   // Landscape A4 to fit 7 columns
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -1649,6 +1621,22 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose) {
 
     y += 2;
   });
+
+  // ── DRIVER ──
+  if (driverArrived || driverLeft) {
+    if (y + 10 > PH - 22) { doc.addPage(); y = 14; }
+    fill(250,247,242); doc.rect(ML, y, CW, 9, 'F');
+    draw(220,210,198); doc.setLineWidth(0.2);
+    doc.rect(ML, y, CW, 9, 'S');
+    bold(7); rgb(140,112,96);
+    doc.text('DRIVER', ML+3, y+3.2);
+    norm(8); rgb(44,26,16);
+    const driverParts = [];
+    if (driverArrived) driverParts.push('Arrived: ' + driverArrived);
+    if (driverLeft)    driverParts.push('Left: ' + driverLeft);
+    doc.text(driverParts.join('   ·   '), ML + 28, y + 5.8);
+    y += 10;
+  }
 
   // ── ELECTRICITY ──
   if (elecOpen || elecClose) {
