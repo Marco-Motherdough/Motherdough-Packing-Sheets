@@ -948,10 +948,11 @@ function applySheetFromGAS(data) {
   });
   if (data.meta) {
     var m = data.meta;
-    if (m.ForecastBy) names.forecast = String(m.ForecastBy);
-    if (m.MixedBy)    names.mix      = String(m.MixedBy);
-    if (m.PackedBy)   names.packed   = String(m.PackedBy);
-    if (m.LoadedBy)   names.loaded   = String(m.LoadedBy);
+    if (m.ForecastBy)  names.forecast = String(m.ForecastBy);
+    if (m.MixedBy)     names.mix      = String(m.MixedBy);
+    if (m.PackedBy)    names.packed   = String(m.PackedBy);
+    if (m.LoadedBy)    names.loaded   = String(m.LoadedBy);
+    if (m.ReceivedBy)  names.store    = String(m.ReceivedBy);
   }
   return matched;
 }
@@ -1321,7 +1322,19 @@ function updateProgress() {
 /* ── PDF GENERATION ── */
 /* ── NAME FIELDS ── */
 // Names stored per stage
-const names = { forecast: '', mix: '', packed: '', loaded: '', store: '' };
+// Names backed by localStorage — persist across sessions without needing a save
+const ROLE_KEYS = { forecast: 'md_name_forecast', mix: 'md_name_mix', packed: 'md_name_packed', loaded: 'md_name_loaded', store: 'md_name_store' };
+function loadNamesFromLocal() {
+  var n = {};
+  Object.keys(ROLE_KEYS).forEach(function(k) {
+    try { n[k] = localStorage.getItem(ROLE_KEYS[k]) || ''; } catch(e) { n[k] = ''; }
+  });
+  return n;
+}
+function saveNameToLocal(key, val) {
+  try { localStorage.setItem(ROLE_KEYS[key], val); } catch(e) {}
+}
+const names = loadNamesFromLocal();
 
 function renderNameFields() {
   const wrap = document.getElementById('nameFieldsWrap');
@@ -1336,7 +1349,7 @@ function renderNameFields() {
         <div class="field">
           <label style="${labelStyle}">Forecast by</label>
           <input type="text" id="name-forecast" placeholder="Your name" value="${names.forecast}"
-            oninput="names.forecast=this.value" style="${fieldStyle}"/>
+            oninput="names.forecast=this.value; saveNameToLocal('forecast',this.value)" style="${fieldStyle}"/>
         </div>
       </div>`;
   } else if (currentStage === 'bakery') {
@@ -1345,17 +1358,17 @@ function renderNameFields() {
         <div class="field">
           <label style="${labelStyle}">Mixed by</label>
           <input type="text" id="name-mix" placeholder="Your name" value="${names.mix}"
-            oninput="names.mix=this.value" style="${fieldStyle}"/>
+            oninput="names.mix=this.value; saveNameToLocal('mix',this.value)" style="${fieldStyle}"/>
         </div>
         <div class="field">
           <label style="${labelStyle}">Packed by</label>
           <input type="text" id="name-packed" placeholder="Your name" value="${names.packed}"
-            oninput="names.packed=this.value" style="${fieldStyle}"/>
+            oninput="names.packed=this.value; saveNameToLocal('packed',this.value)" style="${fieldStyle}"/>
         </div>
         <div class="field">
           <label style="${labelStyle}">Loaded by</label>
           <input type="text" id="name-loaded" placeholder="Your name" value="${names.loaded}"
-            oninput="names.loaded=this.value" style="${fieldStyle}"/>
+            oninput="names.loaded=this.value; saveNameToLocal('loaded',this.value)" style="${fieldStyle}"/>
         </div>
       </div>`;
   } else if (currentStage === 'stores') {
@@ -1364,7 +1377,7 @@ function renderNameFields() {
         <div class="field">
           <label style="${labelStyle}">Received by</label>
           <input type="text" id="name-store" placeholder="Your name" value="${names.store}"
-            oninput="names.store=this.value" style="${fieldStyle}"/>
+            oninput="names.store=this.value; saveNameToLocal('store',this.value)" style="${fieldStyle}"/>
         </div>
       </div>`;
   }
