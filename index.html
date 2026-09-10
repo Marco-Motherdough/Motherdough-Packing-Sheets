@@ -899,25 +899,29 @@ function startRole(role) {
 function applyForecastFromGAS(data) {
   var STORES = ['FHK', 'STB', 'JHK'];
   if (!data || !data.entries) return;
+
+  // Restore quantities (Mix, Packed, Loaded)
   STORES.forEach(function(store) {
     PRODUCTS.forEach(function(p) {
       var entry = data.entries.find(function(e) {
         return e.store === store && (String(e.sku) === String(p.sku) || String(e.productId) === String(p.id));
       });
       if (!entry) return;
-      // Fill Mix (always)
-      if (entry.mix !== '' && entry.mix !== undefined && entry.mix !== null) {
-        quantities[store][p.id]['Mix'] = String(entry.mix);
-      }
-      // Fill Packed + Loaded if previously saved (for re-open continuity)
-      if (entry.packed !== '' && entry.packed !== undefined && entry.packed !== null) {
-        quantities[store][p.id]['Packed'] = String(entry.packed);
-      }
-      if (entry.loaded !== '' && entry.loaded !== undefined && entry.loaded !== null) {
-        quantities[store][p.id]['Loaded'] = String(entry.loaded);
-      }
+      var notEmpty = function(v) { return v !== '' && v !== undefined && v !== null && v !== 0; };
+      if (notEmpty(entry.mix))    quantities[store][p.id]['Mix']    = String(entry.mix);
+      if (notEmpty(entry.packed)) quantities[store][p.id]['Packed'] = String(entry.packed);
+      if (notEmpty(entry.loaded)) quantities[store][p.id]['Loaded'] = String(entry.loaded);
     });
   });
+
+  // Restore names from meta (so Mixed by / Packed by / Loaded by re-appear)
+  // Use the first store's meta that has names (all 3 stores share the same bakery names)
+  if (data.meta) {
+    var storeMeta = data.meta['FHK'] || data.meta['STB'] || data.meta['JHK'] || {};
+    if (storeMeta.MixedBy)  names.mix    = String(storeMeta.MixedBy);
+    if (storeMeta.PackedBy) names.packed = String(storeMeta.PackedBy);
+    if (storeMeta.LoadedBy) names.loaded = String(storeMeta.LoadedBy);
+  }
 }
 
 function applySheetFromGAS(data) {
