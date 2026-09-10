@@ -701,8 +701,8 @@ const PRODUCTS = [
 const CATEGORIES = ['Breads','Savoury Bakes','Panini & Toasties','Cornetti','Sweet Bakes','Bomboloni','Treats','Pizza'];
 const CAT_EMOJI  = { 'Breads':'🍞', 'Savoury Bakes':'🥐', 'Panini & Toasties':'🫓', 'Cornetti':'🥐', 'Sweet Bakes':'🍥', 'Bomboloni':'🍩', 'Treats':'🧁', 'Pizza':'🍕' };
 
-const FIELDS_DEFAULT = ['Mix','Packed','Loaded','Delivered','Don','Ref','Stf','Fro'];
-const FIELDS_FHK     = ['Mix','Packed','Loaded','Delivered','Don','Stf','Fro','Bake'];
+const FIELDS_DEFAULT = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro'];
+const FIELDS_FHK     = ['Mix','Packed','Loaded','Received','Don','Stf','Fro','Bake'];
 const FIELDS_TREATS  = ['In Stock'];
 const ALL_FIELDS     = [...new Set([...FIELDS_DEFAULT, ...FIELDS_FHK, ...FIELDS_TREATS])];
 
@@ -987,8 +987,8 @@ async function saveToSheets() {
       var storeData = {};
       PRODUCTS.forEach(function(p) {
         var sf = store === 'FHK'
-          ? ['Received','Don','Stf','Fro','Bake','InStock']
-          : ['Received','Don','Ref','Stf','Fro','InStock'];
+          ? ['Received','Don','Stf','Fro','Bake']
+          : ['Received','Don','Ref','Stf','Fro'];
         var entry = {};
         sf.forEach(function(f) { entry[f] = quantities[store][p.id][f] || ''; });
         storeData[p.id] = entry;
