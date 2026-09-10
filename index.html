@@ -819,6 +819,26 @@ function showRoleStatus(msg, isError) {
   el.textContent      = msg;
 }
 
+function lockStoreSelector(role) {
+  // For store roles: hide other store buttons, lock to this store only
+  document.querySelectorAll('.store-btn').forEach(function(b) {
+    if (role === 'bakery') {
+      // Bakery can see all stores (switches between them to fill each)
+      b.style.display = '';
+      b.disabled = false;
+    } else {
+      // Store role: only show their store
+      if (b.dataset.store === role) {
+        b.style.display = '';
+        b.classList.add('active');
+        b.disabled = true; // cosmetically locked — no switching
+      } else {
+        b.style.display = 'none';
+      }
+    }
+  });
+}
+
 function startRole(role) {
   try {
     var dateEl = document.getElementById('roleDate');
@@ -844,8 +864,9 @@ function startRole(role) {
           applyForecastFromGAS(d);
           document.getElementById('sheet-date').value = date;
           document.getElementById('rolePicker').style.display = 'none';
+          lockStoreSelector('bakery');
           renderProducts(); renderActionButtons(); renderNameFields();
-          showToast('✅ Mix loaded for all 3 stores');
+          showToast('✅ Data loaded for all 3 stores');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -860,8 +881,9 @@ function startRole(role) {
           var cnt = applySheetFromGAS(d);
           document.getElementById('sheet-date').value = date;
           document.getElementById('rolePicker').style.display = 'none';
+          lockStoreSelector(role);
           renderProducts(); renderActionButtons(); renderNameFields();
-          showToast('✅ ' + role + ': ' + (d.entries ? d.entries.length : 0) + ' rows, ' + cnt + ' fields filled');
+          showToast('✅ ' + role + ' loaded — ' + cnt + ' fields');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -879,9 +901,20 @@ function applyForecastFromGAS(data) {
   if (!data || !data.entries) return;
   STORES.forEach(function(store) {
     PRODUCTS.forEach(function(p) {
-      var entry = data.entries.find(function(e) { return e.store === store && String(e.sku) === String(p.sku); });
-      if (entry && entry.mix !== '' && entry.mix !== undefined && entry.mix !== null) {
+      var entry = data.entries.find(function(e) {
+        return e.store === store && (String(e.sku) === String(p.sku) || String(e.productId) === String(p.id));
+      });
+      if (!entry) return;
+      // Fill Mix (always)
+      if (entry.mix !== '' && entry.mix !== undefined && entry.mix !== null) {
         quantities[store][p.id]['Mix'] = String(entry.mix);
+      }
+      // Fill Packed + Loaded if previously saved (for re-open continuity)
+      if (entry.packed !== '' && entry.packed !== undefined && entry.packed !== null) {
+        quantities[store][p.id]['Packed'] = String(entry.packed);
+      }
+      if (entry.loaded !== '' && entry.loaded !== undefined && entry.loaded !== null) {
+        quantities[store][p.id]['Loaded'] = String(entry.loaded);
       }
     });
   });
