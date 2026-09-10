@@ -711,6 +711,12 @@ function getFields(p) {
   return selectedStore === 'FHK' ? FIELDS_FHK : FIELDS_DEFAULT;
 }
 
+// Returns display label for a field — STB shows 'Bar' where others show 'Ref'
+function getFieldLabel(f) {
+  if (f === 'Ref' && selectedStore === 'STB') return 'Bar';
+  return f;
+}
+
 let selectedStore = 'FHK';
 const quantities = {};
 ['FHK','STB','JHK'].forEach(s => {
@@ -1151,7 +1157,7 @@ function renderProducts() {
         const isLocked = lockedFields.includes(f);
         return `
         <div class="field-cell">
-          <label style="${isLocked ? 'color:var(--amber);' : ''}">${f}${isLocked ? ' 🔒' : ''}</label>
+          <label style="${isLocked ? 'color:var(--amber);' : ''}">${getFieldLabel(f)}${isLocked ? ' 🔒' : ''}</label>
           <input
             type="number"
             id="qty-${p.id}-${f}"
@@ -1501,9 +1507,9 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   doc.rect(ML, y, CW, 7, 'F');
   bold(7); rgb(255,255,255);
   doc.text('Product', ML+2, y+4.8);
-  getFields().forEach((f, i) => {
+  getFields().forEach((f, i) => { const fLabel = getFieldLabel(f);
     const cx = ML + NAME_W + i * FIELD_W_DEFAULT + FIELD_W_DEFAULT / 2;
-    doc.text(f.toUpperCase(), cx, y+4.8, { align:'center' });
+    doc.text(fLabel.toUpperCase(), cx, y+4.8, { align:'center' });
   });
   y += 7;
 
@@ -1527,7 +1533,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
       doc.text('Product', ML+2, y+4.8);
       getFields().forEach((f, i) => {
         const cx = ML + NAME_W + i * FIELD_W_DEFAULT + FIELD_W_DEFAULT / 2;
-        doc.text(f.toUpperCase(), cx, y+4.8, { align:'center' });
+        doc.text(getFieldLabel(f).toUpperCase(), cx, y+4.8, { align:'center' });
       });
       y += 7;
     }
