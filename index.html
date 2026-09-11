@@ -585,7 +585,7 @@
     <div class="field-row">
       <div class="field">
         <label>Opening Units</label>
-        <input type="number" id="elec-open" placeholder="e.g. 1240" min="0" step="0.1" oninput="calcElec()"/>
+        <input type="number" id="elec-open" placeholder="e.g. 1240" min="0" step="0.1" oninput="calcElec(); try{localStorage.setItem('md_elec_open_'+selectedStore, this.value)}catch(e){}"/>
       </div>
       <div class="field">
         <label>Closing Units</label>
@@ -953,6 +953,16 @@ function applySheetFromGAS(data) {
     if (m.PackedBy)    names.packed   = String(m.PackedBy);
     if (m.LoadedBy)    names.loaded   = String(m.LoadedBy);
     if (m.ReceivedBy)  names.store    = String(m.ReceivedBy);
+    // Restore electricity opening from localStorage if not in meta
+    var savedElec = '';
+    try { savedElec = localStorage.getItem('md_elec_open_' + data.store) || ''; } catch(e) {}
+    if (m.ElecOpen) {
+      var el = document.getElementById('elec-open');
+      if (el) { el.value = String(m.ElecOpen); calcElec(); }
+    } else if (savedElec) {
+      var el2 = document.getElementById('elec-open');
+      if (el2) { el2.value = savedElec; calcElec(); }
+    }
   }
   return matched;
 }
@@ -1446,8 +1456,8 @@ function renderActionButtons() {
     const bPDF = document.createElement('button');
     bPDF.id = 'generateBtn';
     bPDF.style.cssText = btnStyle + 'background:var(--espresso);color:white;box-shadow:0 4px 20px rgba(44,26,16,0.25);';
-    bPDF.innerHTML = '<span style="font-size:18px;">📄</span> Generate &amp; Download PDF';
-    bPDF.onclick = generatePDF;
+    bPDF.innerHTML = '<span style="font-size:18px;">📄</span> Generate PDF';
+    bPDF.onclick = showPDFTypePicker;
     wrap.appendChild(bPDF);
   }
 }
@@ -1460,7 +1470,33 @@ function exportStage(nextStage) {
 
 
 
-function generatePDF() {
+function showPDFTypePicker() {
+  var ex = document.getElementById('pdfTypeModal');
+  if (ex) ex.remove();
+  var modal = document.createElement('div');
+  modal.id = 'pdfTypeModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(28,20,16,0.78);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#FAF7F2;border-radius:20px 20px 0 0;padding:28px 22px 44px;width:100%;max-width:520px;font-family:inherit;">
+      <div style="font-size:16px;font-weight:700;color:#2C1A10;margin-bottom:6px;">What are you sending?</div>
+      <div style="font-size:13px;color:#8A7060;margin-bottom:20px;">This sets the PDF title.</div>
+      <div style="display:grid;gap:10px;">
+        <button onclick="document.getElementById('pdfTypeModal').remove(); generatePDF('Opening Stock')"
+          style="padding:16px;background:#2C1A10;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+          🌅  Opening Stock Sheet
+        </button>
+        <button onclick="document.getElementById('pdfTypeModal').remove(); generatePDF('Closing Stock')"
+          style="padding:16px;background:#4A7A5C;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+          🌇  Closing Stock Sheet
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+function generatePDF(stockType) {
+  stockType = stockType || 'Opening Stock';
   const dateVal       = document.getElementById('sheet-date').value;
   const notesVal      = document.getElementById('sheet-notes').value.trim();
   const elecOpen      = document.getElementById('elec-open').value.trim();
@@ -1483,14 +1519,15 @@ function generatePDF() {
   });
 
   loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-    .then(() => buildPDF(dateVal, names, notesVal, elecOpen, elecClose, driverArrived, driverLeft))
+    .then(() => buildPDF(dateVal, names, notesVal, elecOpen, elecClose, driverArrived, driverLeft, stockType))
     .catch(err => { showToast('❌ Could not load PDF library'); console.error(err); })
     .finally(() => {
       if (btn) { btn.disabled = false; btn.innerHTML = '<span style="font-size:18px;">📄</span> Generate & Download PDF'; }
     });
 }
 
-function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrived, driverLeft) {
+function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrived, driverLeft, stockType) {
+  stockType = stockType || 'Opening Stock';
   const { jsPDF } = window.jspdf;
   // Landscape A4 to fit 7 columns
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -1520,7 +1557,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   rgb(255,255,255); bold(16);
   doc.text('Mother Dough', ML, 10);
   norm(8); rgb(200,180,160);
-  doc.text('Opening Stock Sheet', ML, 16.5);
+  doc.text(stockType + ' Sheet', ML, 16.5);
   bold(8); rgb(255,255,255);
   doc.text(dateLabel, PW-MR, 10, { align:'right' });
   norm(8); rgb(200,180,160);
@@ -1541,8 +1578,8 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(7); rgb(44,26,16);
   doc.text('STAFF', ML+70, y+3.5);
   bold(8.5); rgb(44,26,16);
-  const mixName = allNames.mix || '—';
-  doc.text(mixName, ML+70, y+7.5);
+  const staffName = allNames.store || allNames.mix || '—';
+  doc.text(staffName, ML+70, y+7.5);
   const storeProdsPDF = PRODUCTS.filter(p => !p.stores || p.stores.includes(selectedStore));
   const filledCount = storeProdsPDF.filter(p => getFields(p).some(f => quantities[selectedStore][p.id][f] !== '')).length;
   bold(7); rgb(44,26,16);
@@ -1702,7 +1739,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
     draw(200,185,168); doc.setLineWidth(0.3);
     doc.rect(ML, y, CW, 16, 'S');
     bold(7.5); rgb(184,115,51);
-    doc.text('⚡ ELECTRICITY UNITS', ML+3, y+5);
+    doc.text('ELECTRICITY UNITS', ML+3, y+5);
     norm(8.5); rgb(44,26,16);
     const col = CW / 3;
     bold(7); rgb(120,100,85);
@@ -1768,7 +1805,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   drawFooter(doc, PW, PH, ML, MR);
 
   // ── FILENAME ──
-  const fname = `MotherDough-OpeningStock-${selectedStore}-${dateVal}.pdf`;
+  const stockLabel = stockType.replace(' ',''); const fname = `MotherDough-${stockLabel}-${selectedStore}-${dateVal}.pdf`;
   // Use Web Share API on iOS (shares actual PDF file to WhatsApp etc)
   // Fall back to download on desktop/Android
   const pdfBlob = doc.output('blob');
