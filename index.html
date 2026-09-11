@@ -1561,7 +1561,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(8); rgb(255,255,255);
   doc.text(dateLabel, PW-MR, 10, { align:'right' });
   norm(8); rgb(200,180,160);
-  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.store && 'Store: ' + allNames.store].filter(Boolean).join('  ·  ') || '—';
+  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.loaded && 'Loaded: ' + allNames.loaded, allNames.store && 'Store: ' + allNames.store].filter(Boolean).join('  ·  ') || '—';
   doc.text(storeNames[selectedStore], PW-MR, 12, { align:'right' });
   doc.text(headerNames, PW-MR, 16.5, { align:'right' });
 
