@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-  <title>Mother Dough · Opening Stock</title>
+  <title>Motherdough · Opening Stock</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
@@ -501,7 +501,7 @@
   <div class="header">
     <div class="logo">🥐</div>
     <div class="header-text">
-      <h1>Mother Dough</h1>
+      <h1>Motherdough</h1>
       <p>Opening Stock Sheet</p>
     </div>
   </div>
@@ -1555,7 +1555,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   fill(44,26,16);
   doc.rect(0, 0, PW, 22, 'F');
   rgb(255,255,255); bold(16);
-  doc.text('Mother Dough', ML, 10);
+  doc.text('Motherdough', ML, 10);
   norm(8); rgb(200,180,160);
   doc.text(stockType + ' Sheet', ML, 16.5);
   bold(8); rgb(255,255,255);
@@ -1835,7 +1835,7 @@ function drawFooter(doc, PW, PH, ML, MR) {
   doc.line(ML, PH-10, PW-MR, PH-10);
   doc.setFont('helvetica','normal'); doc.setFontSize(7);
   doc.setTextColor(150,130,115);
-  doc.text('Mother Dough Bakery', ML, PH-5.5);
+  doc.text('Motherdough Bakery', ML, PH-5.5);
   doc.text('Generated ' + new Date().toLocaleString('en-ZA'), PW-MR, PH-5.5, { align:'right' });
 }
 
