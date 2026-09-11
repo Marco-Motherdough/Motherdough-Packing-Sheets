@@ -573,7 +573,7 @@
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill" id="progressFill"></div>
     </div>
-    <div class="progress-label" id="progressLabel">0 of 27 products filled</div>
+    <div class="progress-label" id="progressLabel">0 of 28 products filled</div>
   </div>
 
   <!-- PRODUCTS -->
@@ -686,28 +686,19 @@ const PRODUCTS = [
   { id:25, name:'Bombolone LC',        sku:'B-LC001',      emoji:'🍩', cat:'Bomboloni' },
   { id:26, name:'Bombolone MT',        sku:'10022',        emoji:'🍩', cat:'Bomboloni' },
   { id:27, name:'Zeppola - single',         sku:'Z-S001',   emoji:'🍩', cat:'Bomboloni' },
-  // Treats
-  { id:28, name:'Muffin — Lemon Poppyseed', sku:'M-LP001',  emoji:'🧁', cat:'Treats' },
-  { id:29, name:'Muffin — Blueberry',       sku:'M-B002',   emoji:'🧁', cat:'Treats' },
-  { id:30, name:'Muffin — Breakfast',       sku:'M-B001',   emoji:'🧁', cat:'Treats' },
-  { id:31, name:'Banana Bread',             sku:'10417',    emoji:'🍌', cat:'Treats' },
-  { id:32, name:'Sbrisolina Blueberry',     sku:'SB002',    emoji:'🫐', cat:'Treats' },
-  { id:33, name:'Crostata al Caramello',    sku:'10032',    emoji:'🥧', cat:'Treats' },
   // Pizza — store-specific
   { id:34, name:'Pizza Balls',              sku:'PZB001',   emoji:'🍕', cat:'Pizza', stores:['JHK'] },
   { id:35, name:'Pizza Ball Trays',         sku:'PZBT001',  emoji:'🍕', cat:'Pizza', stores:['FHK','STB'] },
 ];
 
-const CATEGORIES = ['Breads','Savoury Bakes','Panini & Toasties','Cornetti','Sweet Bakes','Bomboloni','Treats','Pizza'];
-const CAT_EMOJI  = { 'Breads':'🍞', 'Savoury Bakes':'🥐', 'Panini & Toasties':'🫓', 'Cornetti':'🥐', 'Sweet Bakes':'🍥', 'Bomboloni':'🍩', 'Treats':'🧁', 'Pizza':'🍕' };
+const CATEGORIES = ['Breads','Savoury Bakes','Panini & Toasties','Cornetti','Sweet Bakes','Bomboloni','Pizza'];
+const CAT_EMOJI  = { 'Breads':'🍞', 'Savoury Bakes':'🥐', 'Panini & Toasties':'🫓', 'Cornetti':'🥐', 'Sweet Bakes':'🍥', 'Bomboloni':'🍩', 'Pizza':'🍕' };
 
 const FIELDS_DEFAULT = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro'];
 const FIELDS_FHK     = ['Mix','Packed','Loaded','Received','Don','Stf','Fro','Bake'];
-const FIELDS_TREATS  = ['In Stock'];
-const ALL_FIELDS     = [...new Set([...FIELDS_DEFAULT, ...FIELDS_FHK, ...FIELDS_TREATS])];
+const ALL_FIELDS     = [...new Set([...FIELDS_DEFAULT, ...FIELDS_FHK])];
 
 function getFields(p) {
-  if (p && p.cat === 'Treats') return FIELDS_TREATS;
   return selectedStore === 'FHK' ? FIELDS_FHK : FIELDS_DEFAULT;
 }
 
@@ -930,7 +921,7 @@ function applySheetFromGAS(data) {
     return 0;
   }
   var store   = data.store;
-  var fields  = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake','InStock'];
+  var fields  = ['Mix','Packed','Loaded','Received','Don','Ref','Stf','Fro','Bake'];
   var matched = 0;
   var skipped = [];
   data.entries.forEach(function(entry) {
@@ -985,7 +976,6 @@ async function saveToSheets() {
       ['FHK','STB','JHK'].forEach(function(store) {
         data[store] = {};
         PRODUCTS.forEach(function(p) {
-          if (p.cat === 'Treats') return;
           data[store][p.id] = {
             Packed: quantities[store][p.id]['Packed'] || '',
             Loaded: quantities[store][p.id]['Loaded'] || ''
@@ -1683,7 +1673,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         doc.text(mmNotes, ML+3, y + ROW_H - 1.5);
       }
 
-      // Field values - per-product (Treats = single 'In Stock' column)
+      // Field values - per-product
       const pFields = getFields(p);
       const pFieldW = (CW - NAME_W) / pFields.length;
       pFields.forEach((f, i) => {
@@ -1907,7 +1897,6 @@ function applyForecastFromServer(normalData, cornettiData, packingDate) {
 
     let matched = 0;
     PRODUCTS.forEach(p => {
-      if (p.cat === 'Treats') return;
       // Skip products not stocked at this store
       if (p.stores && !p.stores.includes(store)) return;
       const sku = p.sku.toUpperCase();
