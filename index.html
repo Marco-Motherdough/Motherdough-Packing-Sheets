@@ -616,8 +616,8 @@
   <!-- PRODUCTS -->
   <div id="productSections"></div>
 
-  <!-- ELECTRICITY -->
-  <div class="card">
+  <!-- ELECTRICITY — hidden for JHK, which doesn't track this (see renderProducts()) -->
+  <div class="card" id="electricityCard">
     <div class="card-title">⚡ Electricity Units</div>
     <div class="field-row">
       <div class="field">
@@ -843,6 +843,22 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxj3O8z3r05PNM
 var currentRole = '';
 var currentDate = '';
 
+// Apps Script sometimes fails (cold start, timeout, quota, bad deployment) and
+// returns an HTML error/sign-in page with a 200 status instead of JSON — parsing
+// that as JSON throws a confusing "Unexpected token '<'" error. Check first and
+// surface a clear message instead.
+async function safeFetchJSON(r) {
+  var ct = (r.headers.get('content-type') || '').toLowerCase();
+  if (!r.ok || ct.indexOf('json') === -1) {
+    throw new Error('Google Sheets returned an error page — try again');
+  }
+  try {
+    return await r.json();
+  } catch (e) {
+    throw new Error('Google Sheets returned an error page — try again');
+  }
+}
+
 function showRoleStatus(msg, isError) {
   var el = document.getElementById('roleStatus');
   if (!el) return;
@@ -893,7 +909,7 @@ function startRole(role) {
     if (role === 'bakery') {
       currentStage = 'bakery';
       fetch(APPS_SCRIPT_URL + '?action=loadForecast&date=' + encodeURIComponent(date))
-        .then(function(r) { return r.json(); })
+        .then(safeFetchJSON)
         .then(function(d) {
           applyForecastFromGAS(d);
           document.getElementById('sheet-date').value = date;
@@ -911,7 +927,7 @@ function startRole(role) {
       currentStage  = 'stores';
       selectedStore = role;
       fetch(APPS_SCRIPT_URL + '?action=loadSheet&date=' + encodeURIComponent(date) + '&store=' + encodeURIComponent(role))
-        .then(function(r) { return r.json(); })
+        .then(safeFetchJSON)
         .then(function(d) {
           var cnt = applySheetFromGAS(d);
           document.getElementById('sheet-date').value = date;
@@ -1056,7 +1072,7 @@ async function saveToSheets() {
     var form = new FormData();
     form.append('payload', JSON.stringify(payload));
     var r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: form });
-    var result = await r.json();
+    var result = await safeFetchJSON(r);
     if (result.error) throw new Error(result.error);
     showToast('✅ Saved to Google Sheets');
   } catch(e) {
@@ -1211,6 +1227,10 @@ function setStore(code, btn) {
 
 /* ── RENDER PRODUCT SECTIONS ── */
 function renderProducts() {
+  // JHK doesn't track electricity units — hide the whole card for that store
+  const elecCard = document.getElementById('electricityCard');
+  if (elecCard) elecCard.style.display = selectedStore === 'JHK' ? 'none' : '';
+
   const container = document.getElementById('productSections');
   container.innerHTML = '';
 
