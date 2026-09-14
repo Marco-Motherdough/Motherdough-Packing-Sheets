@@ -663,12 +663,12 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- SAVING OVERLAY — blocks all interaction while a save is in flight -->
-<div class="saving-overlay" id="savingOverlay" onclick="showToast('⏳ Waiting for save to complete…')">
+<!-- SAVING OVERLAY — blocks all interaction while saving/connecting to Google Sheets -->
+<div class="saving-overlay" id="savingOverlay" onclick="showToast(savingOverlayClickMsg)">
   <div class="saving-card">
     <div class="saving-spinner"></div>
-    <div style="font-weight:600;color:var(--espresso);font-size:15px;">Saving to Google Sheets…</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Please wait, this won't take long.</div>
+    <div id="savingTitle" style="font-weight:600;color:var(--espresso);font-size:15px;">Saving to Google Sheets…</div>
+    <div id="savingSubtitle" style="font-size:12px;color:var(--text-muted);margin-top:4px;">Please wait, this won't take long.</div>
   </div>
 </div>
 
@@ -885,6 +885,7 @@ function startRole(role) {
 
     showRoleStatus('⏳ Connecting to Google Sheets…', false);
     document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = true; });
+    showSavingOverlay('Connecting to Google Sheets…', 'Loading your sheet, please wait.', '⏳ Waiting for Google Sheets to connect…');
 
     currentRole = role;
     currentDate = date;
@@ -904,7 +905,8 @@ function startRole(role) {
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
           document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
-        });
+        })
+        .finally(function() { hideSavingOverlay(); });
     } else {
       currentStage  = 'stores';
       selectedStore = role;
@@ -921,11 +923,13 @@ function startRole(role) {
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
           document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
-        });
+        })
+        .finally(function() { hideSavingOverlay(); });
     }
   } catch(err) {
     showRoleStatus('❌ Unexpected error: ' + err.message, true);
     document.querySelectorAll('#rolePicker button').forEach(function(b) { b.disabled = false; });
+    hideSavingOverlay();
   }
 }
 
@@ -1988,9 +1992,16 @@ function showToast(msg) {
 }
 
 /* ── SAVING OVERLAY ── */
-function showSavingOverlay() {
+let savingOverlayClickMsg = '⏳ Please wait…';
+function showSavingOverlay(title, subtitle, clickMsg) {
   const ov = document.getElementById('savingOverlay');
-  if (ov) ov.classList.add('show');
+  if (!ov) return;
+  const t = document.getElementById('savingTitle');
+  const s = document.getElementById('savingSubtitle');
+  if (t) t.textContent = title    || 'Saving to Google Sheets…';
+  if (s) s.textContent = subtitle || "Please wait, this won't take long.";
+  savingOverlayClickMsg = clickMsg || '⏳ Please wait…';
+  ov.classList.add('show');
 }
 function hideSavingOverlay() {
   const ov = document.getElementById('savingOverlay');
