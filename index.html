@@ -943,7 +943,9 @@ function applySheetFromGAS(data) {
     if (m.MixedBy)     names.mix      = String(m.MixedBy);
     if (m.PackedBy)    names.packed   = String(m.PackedBy);
     if (m.LoadedBy)    names.loaded   = String(m.LoadedBy);
-    if (m.ReceivedBy)  names.store    = String(m.ReceivedBy);
+    if (m.OpenedBy)    names.storeOpen  = String(m.OpenedBy);
+    if (m.ClosedBy)    names.storeClose = String(m.ClosedBy);
+    else if (m.ReceivedBy) names.storeOpen = String(m.ReceivedBy); // legacy sheets column
     // Restore electricity opening from localStorage if not in meta
     var savedElec = '';
     try { savedElec = localStorage.getItem('md_elec_open_' + data.store) || ''; } catch(e) {}
@@ -962,7 +964,7 @@ async function saveToSheets() {
   if (!currentRole || !currentDate) { showToast('⚠️ No role selected'); return; }
   if (!validateCurrentName()) {
     if (currentRole === 'bakery') showToast('⚠️ Enter Mixed by, Packed by and Loaded by');
-    else showToast('⚠️ Enter your name');
+    else showToast('⚠️ Enter Opened by or Closed by');
     return;
   }
   getNamesSnapshot();
@@ -1323,7 +1325,7 @@ function updateProgress() {
 /* ── NAME FIELDS ── */
 // Names stored per stage
 // Names backed by localStorage — persist across sessions without needing a save
-const ROLE_KEYS = { forecast: 'md_name_forecast', mix: 'md_name_mix', packed: 'md_name_packed', loaded: 'md_name_loaded', store: 'md_name_store' };
+const ROLE_KEYS = { forecast: 'md_name_forecast', mix: 'md_name_mix', packed: 'md_name_packed', loaded: 'md_name_loaded', storeOpen: 'md_name_store_open', storeClose: 'md_name_store_close' };
 function loadNamesFromLocal() {
   var n = {};
   Object.keys(ROLE_KEYS).forEach(function(k) {
@@ -1373,11 +1375,16 @@ function renderNameFields() {
       </div>`;
   } else if (currentStage === 'stores') {
     wrap.innerHTML = `
-      <div class="field-row full" style="margin-top:12px;">
+      <div class="field-row" style="margin-top:12px;">
         <div class="field">
-          <label style="${labelStyle}">Received by</label>
-          <input type="text" id="name-store" placeholder="Your name" value="${names.store}"
-            oninput="names.store=this.value; saveNameToLocal('store',this.value)" style="${fieldStyle}"/>
+          <label style="${labelStyle}">Opened by</label>
+          <input type="text" id="name-store-open" placeholder="Your name" value="${names.storeOpen}"
+            oninput="names.storeOpen=this.value; saveNameToLocal('storeOpen',this.value)" style="${fieldStyle}"/>
+        </div>
+        <div class="field">
+          <label style="${labelStyle}">Closed by</label>
+          <input type="text" id="name-store-close" placeholder="Your name" value="${names.storeClose}"
+            oninput="names.storeClose=this.value; saveNameToLocal('storeClose',this.value)" style="${fieldStyle}"/>
         </div>
       </div>`;
   }
@@ -1393,12 +1400,14 @@ function getNamesSnapshot() {
   const mix      = document.getElementById('name-mix');
   const packed   = document.getElementById('name-packed');
   const loaded   = document.getElementById('name-loaded');
-  const store    = document.getElementById('name-store');
+  const storeOpen  = document.getElementById('name-store-open');
+  const storeClose = document.getElementById('name-store-close');
   if (forecast) names.forecast = forecast.value;
   if (mix)      names.mix      = mix.value;
   if (packed)   names.packed   = packed.value;
   if (loaded)   names.loaded   = loaded.value;
-  if (store)    names.store    = store.value;
+  if (storeOpen)  names.storeOpen  = storeOpen.value;
+  if (storeClose) names.storeClose = storeClose.value;
   return { ...names };
 }
 
@@ -1412,8 +1421,9 @@ function validateCurrentName() {
     const l = document.getElementById('name-loaded');
     return m && m.value.trim() !== '' && p && p.value.trim() !== '' && l && l.value.trim() !== '';
   } else if (currentStage === 'stores') {
-    const s = document.getElementById('name-store');
-    return s && s.value.trim() !== '';
+    const o = document.getElementById('name-store-open');
+    const c = document.getElementById('name-store-close');
+    return (o && o.value.trim() !== '') || (c && c.value.trim() !== '');
   }
   return true;
 }
@@ -1551,7 +1561,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(8); rgb(255,255,255);
   doc.text(dateLabel, PW-MR, 10, { align:'right' });
   norm(8); rgb(200,180,160);
-  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.loaded && 'Loaded: ' + allNames.loaded, allNames.store && 'Store: ' + allNames.store].filter(Boolean).join('  ·  ') || '—';
+  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.loaded && 'Loaded: ' + allNames.loaded, allNames.storeOpen && 'Opened: ' + allNames.storeOpen, allNames.storeClose && 'Closed: ' + allNames.storeClose].filter(Boolean).join('  ·  ') || '—';
   doc.text(storeNames[selectedStore], PW-MR, 12, { align:'right' });
   doc.text(headerNames, PW-MR, 16.5, { align:'right' });
 
@@ -1568,7 +1578,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(7); rgb(44,26,16);
   doc.text('STAFF', ML+70, y+3.5);
   bold(8.5); rgb(44,26,16);
-  const staffName = allNames.store || allNames.mix || '—';
+  const staffName = (stockType === 'Closing Stock' ? allNames.storeClose : allNames.storeOpen) || allNames.mix || '—';
   doc.text(staffName, ML+70, y+7.5);
   const storeProdsPDF = PRODUCTS.filter(p => !p.stores || p.stores.includes(selectedStore));
   const filledCount = storeProdsPDF.filter(p => getFields(p).some(f => quantities[selectedStore][p.id][f] !== '')).length;
@@ -1769,15 +1779,16 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
     fill(250,244,234); doc.rect(ML, y, CW, 22, 'F');
     draw(200,185,168); doc.setLineWidth(0.3);
     doc.rect(ML, y, CW, 22, 'S');
-    const nCols = 5;
-    const nW = CW / nCols;
     const namePairs = [
-      ['FORECAST BY', allNames.forecast || '—'],
-      ['MIXED BY',    allNames.mix      || '—'],
-      ['PACKED BY',   allNames.packed   || '—'],
-      ['LOADED BY',   allNames.loaded   || '—'],
-      ['RECEIVED BY', allNames.store    || '—'],
+      ['FORECAST BY', allNames.forecast  || '—'],
+      ['MIXED BY',    allNames.mix       || '—'],
+      ['PACKED BY',   allNames.packed    || '—'],
+      ['LOADED BY',   allNames.loaded    || '—'],
+      ['OPENED BY',   allNames.storeOpen || '—'],
+      ['CLOSED BY',   allNames.storeClose|| '—'],
     ];
+    const nCols = namePairs.length;
+    const nW = CW / nCols;
     namePairs.forEach(([label, val], i) => {
       const nx = ML + i * nW + 3;
       bold(6.5); rgb(154,122,104);
