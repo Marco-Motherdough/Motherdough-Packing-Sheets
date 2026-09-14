@@ -476,6 +476,43 @@
 
     .toast.show { transform: translateX(-50%) translateY(0); }
 
+    /* ── SAVING OVERLAY ── */
+    .saving-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(28,20,16,0.55);
+      z-index: 9500;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      cursor: wait;
+    }
+
+    .saving-overlay.show { display: flex; }
+
+    .saving-card {
+      background: #FAF7F2;
+      border-radius: 16px;
+      padding: 26px 30px;
+      text-align: center;
+      font-family: var(--font-body);
+      box-shadow: var(--shadow-md);
+      max-width: 320px;
+    }
+
+    .saving-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      margin: 0 auto 14px;
+      animation: saving-spin 0.8s linear infinite;
+    }
+
+    @keyframes saving-spin { to { transform: rotate(360deg); } }
+
     /* ── STATUS DOTS ── */
     .status-dot {
       width: 8px;
@@ -629,6 +666,15 @@
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- SAVING OVERLAY — blocks all interaction while a save is in flight -->
+<div class="saving-overlay" id="savingOverlay" onclick="showToast('⏳ Waiting for save to complete…')">
+  <div class="saving-card">
+    <div class="saving-spinner"></div>
+    <div style="font-weight:600;color:var(--espresso);font-size:15px;">Saving to Google Sheets…</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Please wait, this won't take long.</div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -943,7 +989,9 @@ function applySheetFromGAS(data) {
     if (m.MixedBy)     names.mix      = String(m.MixedBy);
     if (m.PackedBy)    names.packed   = String(m.PackedBy);
     if (m.LoadedBy)    names.loaded   = String(m.LoadedBy);
-    if (m.ReceivedBy)  names.store    = String(m.ReceivedBy);
+    if (m.OpenedBy)    names.storeOpen  = String(m.OpenedBy);
+    if (m.ClosedBy)    names.storeClose = String(m.ClosedBy);
+    else if (m.ReceivedBy) names.storeOpen = String(m.ReceivedBy); // legacy sheets column
     // Restore electricity opening from localStorage if not in meta
     var savedElec = '';
     try { savedElec = localStorage.getItem('md_elec_open_' + data.store) || ''; } catch(e) {}
@@ -962,12 +1010,13 @@ async function saveToSheets() {
   if (!currentRole || !currentDate) { showToast('⚠️ No role selected'); return; }
   if (!validateCurrentName()) {
     if (currentRole === 'bakery') showToast('⚠️ Enter Mixed by, Packed by and Loaded by');
-    else showToast('⚠️ Enter your name');
+    else showToast('⚠️ Enter Opened by or Closed by');
     return;
   }
   getNamesSnapshot();
   var btn = document.getElementById('saveBtn');
   if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  showSavingOverlay();
 
   try {
     var payload;
@@ -1014,6 +1063,7 @@ async function saveToSheets() {
     showToast('❌ Save failed: ' + e.message);
   } finally {
     if (btn) { btn.textContent = '💾 Save to Google Sheets'; btn.disabled = false; }
+    hideSavingOverlay();
   }
 }
 /* ── END GOOGLE SHEETS ROLE PICKER ── */
@@ -1323,7 +1373,7 @@ function updateProgress() {
 /* ── NAME FIELDS ── */
 // Names stored per stage
 // Names backed by localStorage — persist across sessions without needing a save
-const ROLE_KEYS = { forecast: 'md_name_forecast', mix: 'md_name_mix', packed: 'md_name_packed', loaded: 'md_name_loaded', store: 'md_name_store' };
+const ROLE_KEYS = { forecast: 'md_name_forecast', mix: 'md_name_mix', packed: 'md_name_packed', loaded: 'md_name_loaded', storeOpen: 'md_name_store_open', storeClose: 'md_name_store_close' };
 function loadNamesFromLocal() {
   var n = {};
   Object.keys(ROLE_KEYS).forEach(function(k) {
@@ -1373,11 +1423,16 @@ function renderNameFields() {
       </div>`;
   } else if (currentStage === 'stores') {
     wrap.innerHTML = `
-      <div class="field-row full" style="margin-top:12px;">
+      <div class="field-row" style="margin-top:12px;">
         <div class="field">
-          <label style="${labelStyle}">Received by</label>
-          <input type="text" id="name-store" placeholder="Your name" value="${names.store}"
-            oninput="names.store=this.value; saveNameToLocal('store',this.value)" style="${fieldStyle}"/>
+          <label style="${labelStyle}">Opened by</label>
+          <input type="text" id="name-store-open" placeholder="Your name" value="${names.storeOpen}"
+            oninput="names.storeOpen=this.value; saveNameToLocal('storeOpen',this.value)" style="${fieldStyle}"/>
+        </div>
+        <div class="field">
+          <label style="${labelStyle}">Closed by</label>
+          <input type="text" id="name-store-close" placeholder="Your name" value="${names.storeClose}"
+            oninput="names.storeClose=this.value; saveNameToLocal('storeClose',this.value)" style="${fieldStyle}"/>
         </div>
       </div>`;
   }
@@ -1393,12 +1448,14 @@ function getNamesSnapshot() {
   const mix      = document.getElementById('name-mix');
   const packed   = document.getElementById('name-packed');
   const loaded   = document.getElementById('name-loaded');
-  const store    = document.getElementById('name-store');
+  const storeOpen  = document.getElementById('name-store-open');
+  const storeClose = document.getElementById('name-store-close');
   if (forecast) names.forecast = forecast.value;
   if (mix)      names.mix      = mix.value;
   if (packed)   names.packed   = packed.value;
   if (loaded)   names.loaded   = loaded.value;
-  if (store)    names.store    = store.value;
+  if (storeOpen)  names.storeOpen  = storeOpen.value;
+  if (storeClose) names.storeClose = storeClose.value;
   return { ...names };
 }
 
@@ -1412,8 +1469,9 @@ function validateCurrentName() {
     const l = document.getElementById('name-loaded');
     return m && m.value.trim() !== '' && p && p.value.trim() !== '' && l && l.value.trim() !== '';
   } else if (currentStage === 'stores') {
-    const s = document.getElementById('name-store');
-    return s && s.value.trim() !== '';
+    const o = document.getElementById('name-store-open');
+    const c = document.getElementById('name-store-close');
+    return (o && o.value.trim() !== '') || (c && c.value.trim() !== '');
   }
   return true;
 }
@@ -1551,7 +1609,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(8); rgb(255,255,255);
   doc.text(dateLabel, PW-MR, 10, { align:'right' });
   norm(8); rgb(200,180,160);
-  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.loaded && 'Loaded: ' + allNames.loaded, allNames.store && 'Store: ' + allNames.store].filter(Boolean).join('  ·  ') || '—';
+  const headerNames = [allNames.forecast && 'Forecast: ' + allNames.forecast, allNames.mix && 'Mix: ' + allNames.mix, allNames.packed && 'Packed: ' + allNames.packed, allNames.loaded && 'Loaded: ' + allNames.loaded, allNames.storeOpen && 'Opened: ' + allNames.storeOpen, allNames.storeClose && 'Closed: ' + allNames.storeClose].filter(Boolean).join('  ·  ') || '—';
   doc.text(storeNames[selectedStore], PW-MR, 12, { align:'right' });
   doc.text(headerNames, PW-MR, 16.5, { align:'right' });
 
@@ -1568,7 +1626,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(7); rgb(44,26,16);
   doc.text('STAFF', ML+70, y+3.5);
   bold(8.5); rgb(44,26,16);
-  const staffName = allNames.store || allNames.mix || '—';
+  const staffName = (stockType === 'Closing Stock' ? allNames.storeClose : allNames.storeOpen) || allNames.mix || '—';
   doc.text(staffName, ML+70, y+7.5);
   const storeProdsPDF = PRODUCTS.filter(p => !p.stores || p.stores.includes(selectedStore));
   const filledCount = storeProdsPDF.filter(p => getFields(p).some(f => quantities[selectedStore][p.id][f] !== '')).length;
@@ -1769,15 +1827,16 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
     fill(250,244,234); doc.rect(ML, y, CW, 22, 'F');
     draw(200,185,168); doc.setLineWidth(0.3);
     doc.rect(ML, y, CW, 22, 'S');
-    const nCols = 5;
-    const nW = CW / nCols;
     const namePairs = [
-      ['FORECAST BY', allNames.forecast || '—'],
-      ['MIXED BY',    allNames.mix      || '—'],
-      ['PACKED BY',   allNames.packed   || '—'],
-      ['LOADED BY',   allNames.loaded   || '—'],
-      ['RECEIVED BY', allNames.store    || '—'],
+      ['FORECAST BY', allNames.forecast  || '—'],
+      ['MIXED BY',    allNames.mix       || '—'],
+      ['PACKED BY',   allNames.packed    || '—'],
+      ['LOADED BY',   allNames.loaded    || '—'],
+      ['OPENED BY',   allNames.storeOpen || '—'],
+      ['CLOSED BY',   allNames.storeClose|| '—'],
     ];
+    const nCols = namePairs.length;
+    const nW = CW / nCols;
     namePairs.forEach(([label, val], i) => {
       const nx = ML + i * nW + 3;
       bold(6.5); rgb(154,122,104);
@@ -1951,6 +2010,16 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ── SAVING OVERLAY ── */
+function showSavingOverlay() {
+  const ov = document.getElementById('savingOverlay');
+  if (ov) ov.classList.add('show');
+}
+function hideSavingOverlay() {
+  const ov = document.getElementById('savingOverlay');
+  if (ov) ov.classList.remove('show');
 }
 
 init();
