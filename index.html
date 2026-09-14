@@ -622,16 +622,12 @@
     <div class="field-row">
       <div class="field">
         <label>Opening Units</label>
-        <input type="number" id="elec-open" placeholder="e.g. 1240" min="0" step="0.1" oninput="calcElec(); try{localStorage.setItem('md_elec_open_'+selectedStore, this.value)}catch(e){}"/>
+        <input type="number" id="elec-open" placeholder="e.g. 1240" min="0" step="0.1" oninput="try{localStorage.setItem('md_elec_open_'+selectedStore, this.value)}catch(e){}"/>
       </div>
       <div class="field">
         <label>Closing Units</label>
-        <input type="number" id="elec-close" placeholder="e.g. 1190" min="0" step="0.1" oninput="calcElec()"/>
+        <input type="number" id="elec-close" placeholder="e.g. 1190" min="0" step="0.1"/>
       </div>
-    </div>
-    <div id="elec-diff-row" style="display:none;margin-top:8px;padding:10px 12px;background:var(--cream);border-radius:10px;border:1px solid var(--border-light);">
-      <span style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Units Used</span>
-      <span id="elec-diff" style="float:right;font-size:15px;font-weight:700;color:var(--espresso);"></span>
     </div>
   </div>
 
@@ -997,10 +993,10 @@ function applySheetFromGAS(data) {
     try { savedElec = localStorage.getItem('md_elec_open_' + data.store) || ''; } catch(e) {}
     if (m.ElecOpen) {
       var el = document.getElementById('elec-open');
-      if (el) { el.value = String(m.ElecOpen); calcElec(); }
+      if (el) el.value = String(m.ElecOpen);
     } else if (savedElec) {
       var el2 = document.getElementById('elec-open');
-      if (el2) { el2.value = savedElec; calcElec(); }
+      if (el2) el2.value = savedElec;
     }
   }
   return matched;
@@ -1193,7 +1189,6 @@ function applyPrefill() {
   updateProgress();
   renderActionButtons();
   renderNameFields();
-  calcElec();
 
   // Show stage banner
   const label = STAGE_LABELS[currentStage] || {};
@@ -1789,17 +1784,13 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
     bold(7.5); rgb(184,115,51);
     doc.text('ELECTRICITY UNITS', ML+3, y+5);
     norm(8.5); rgb(44,26,16);
-    const col = CW / 3;
+    const col = CW / 2;
     bold(7); rgb(120,100,85);
     doc.text('OPENING', ML+3, y+10.5);
     doc.text('CLOSING', ML+col+3, y+10.5);
-    doc.text('USED', ML+col*2+3, y+10.5);
     bold(10); rgb(44,26,16);
-    doc.text(elecOpen  || '—', ML+3,       y+15.5);
-    doc.text(elecClose || '—', ML+col+3,   y+15.5);
-    const used = (elecOpen && elecClose) ? (parseFloat(elecOpen) - parseFloat(elecClose)).toFixed(1) : '—';
-    rgb(used !== '—' && parseFloat(used) > 0 ? 90 : 44, used !== '—' && parseFloat(used) > 0 ? 122 : 26, used !== '—' && parseFloat(used) > 0 ? 92 : 16);
-    doc.text(used, ML+col*2+3, y+15.5);
+    doc.text(elecOpen  || '—', ML+3,     y+15.5);
+    doc.text(elecClose || '—', ML+col+3, y+15.5);
     y += 20;
   }
 
@@ -1986,22 +1977,6 @@ function applyForecastFromServer(normalData, cornettiData, packingDate) {
     : `✅ All 3 stores loaded · <strong>${totalMatched}</strong> products total<br>
        <small>FHK ${storeCounts.FHK} · STB ${storeCounts.STB} · JHK ${storeCounts.JHK}</small><br>
        <small>Normal → selling <strong>${packingDate}</strong> (mix ${normalData.date}) · Cornetti → selling <strong>${cornettiSaleDate}</strong> (mix ${cornettiData.date})</small>`;
-}
-
-/* ── ELECTRICITY CALC ── */
-function calcElec() {
-  const o = parseFloat(document.getElementById('elec-open').value);
-  const c = parseFloat(document.getElementById('elec-close').value);
-  const row = document.getElementById('elec-diff-row');
-  const diff = document.getElementById('elec-diff');
-  if (!isNaN(o) && !isNaN(c)) {
-    const used = (o - c).toFixed(1);
-    diff.textContent = used + ' units';
-    diff.style.color = parseFloat(used) > 0 ? 'var(--sage)' : 'var(--rust)';
-    row.style.display = 'block';
-  } else {
-    row.style.display = 'none';
-  }
 }
 
 /* ── TOAST ── */
