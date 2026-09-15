@@ -1042,6 +1042,10 @@ async function saveToSheets() {
         data[store] = {};
         PRODUCTS.forEach(function(p) {
           data[store][p.id] = {
+            SKU:         p.sku,
+            Category:    p.cat,
+            ProductName: p.name,
+            Mix:    quantities[store][p.id]['Mix']    || '',
             Packed: quantities[store][p.id]['Packed'] || '',
             Loaded: quantities[store][p.id]['Loaded'] || ''
           };
@@ -1669,13 +1673,24 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
 
   // ── PRODUCT ROWS ──
   const ROW_H = 7;
+  const MISMATCH_EXTRA = 4; // extra height a mismatched row needs for its label + detail line
   const CAT_H = 5.5;
+
+  // Shared mismatch check — used for row height, page breaks, and highlighting
+  const rowHasMismatch = p => {
+    const q = quantities[selectedStore][p.id] || {};
+    return [['Mix','Packed'],['Packed','Received']].some(([a,b]) => {
+      const va = q[a], vb = q[b];
+      return va && va !== '' && vb && vb !== '' && parseInt(va) !== parseInt(vb);
+    });
+  };
 
   CATEGORIES.forEach(cat => {
     const prods = PRODUCTS.filter(p => p.cat === cat && (!p.stores || p.stores.includes(selectedStore)));
     if (!prods.length) return;
 
-    const needed = CAT_H + prods.length * ROW_H;
+    const mismatchCount = prods.filter(rowHasMismatch).length;
+    const needed = CAT_H + prods.length * ROW_H + mismatchCount * MISMATCH_EXTRA;
     if (y + needed > PH - 14) {
       drawFooter(doc, PW, PH, ML, MR);
       doc.addPage();
@@ -1703,36 +1718,34 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
 
     let alt = false;
     prods.forEach(p => {
-      if (y + ROW_H > PH - 14) {
+      // Check mismatches for this product first — the row's own height depends on it
+      const q = quantities[selectedStore][p.id] || {};
+      const mmChecks = [['Mix','Packed'],['Packed','Received']];
+      const hasMismatch = rowHasMismatch(p);
+      const rowH = hasMismatch ? ROW_H + MISMATCH_EXTRA : ROW_H;
+
+      if (y + rowH > PH - 14) {
         drawFooter(doc, PW, PH, ML, MR);
         doc.addPage();
         y = 14;
       }
 
-      if (alt) { fill(252,249,245); doc.rect(ML, y, CW, ROW_H, 'F'); }
+      if (alt) { fill(252,249,245); doc.rect(ML, y, CW, rowH, 'F'); }
       alt = !alt;
 
       draw(238,228,215); doc.setLineWidth(0.12);
-      doc.line(ML, y + ROW_H, ML + CW, y + ROW_H);
+      doc.line(ML, y + rowH, ML + CW, y + rowH);
 
       // Vertical divider between name and fields
       draw(220,210,198); doc.setLineWidth(0.15);
-      doc.line(ML + NAME_W, y, ML + NAME_W, y + ROW_H);
-
-      // Check mismatches for this product
-      const q = quantities[selectedStore][p.id] || {};
-      const mmChecks = [['Mix','Packed'],['Packed','Received']];
-      const hasMismatch = mmChecks.some(([a,b]) => {
-        const va = q[a], vb = q[b];
-        return va && va !== '' && vb && vb !== '' && parseInt(va) !== parseInt(vb);
-      });
+      doc.line(ML + NAME_W, y, ML + NAME_W, y + rowH);
 
       // Highlight row if mismatch
       if (hasMismatch) {
         fill(255,248,235);
-        doc.rect(ML, y, CW, ROW_H, 'F');
+        doc.rect(ML, y, CW, rowH, 'F');
         draw(184,115,51); doc.setLineWidth(0.4);
-        doc.rect(ML, y, CW, ROW_H, 'S');
+        doc.rect(ML, y, CW, rowH, 'S');
       }
 
       // Product name
@@ -1741,13 +1754,13 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
       doc.text(nameLines[0], ML+3, y + 4.5);
       if (hasMismatch) {
         bold(7.5); rgb(184,115,51);
-        doc.text('⚠ MISMATCH', ML+3, y + 4.5 + 3.5);
+        doc.text('⚠ MISMATCH', ML+3, y + 8.3);
         // Detail which pairs mismatch
         const mmNotes = mmChecks
           .filter(([a,b]) => { const va=q[a],vb=q[b]; return va&&va!==''&&vb&&vb!==''&&parseInt(va)!==parseInt(vb); })
           .map(([a,b]) => `${a}:${q[a]} ≠ ${b}:${q[b]}`).join('  ');
         norm(6.5); rgb(184,115,51);
-        doc.text(mmNotes, ML+3, y + ROW_H - 1.5);
+        doc.text(mmNotes, ML+3, y + rowH - 1.5);
       }
 
       // Field values - per-product
@@ -1758,7 +1771,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         const cx = ML + NAME_W + i * pFieldW + pFieldW / 2;
         if (i > 0) {
           draw(230,220,210); doc.setLineWidth(0.1);
-          doc.line(ML + NAME_W + i * pFieldW, y, ML + NAME_W + i * pFieldW, y + ROW_H);
+          doc.line(ML + NAME_W + i * pFieldW, y, ML + NAME_W + i * pFieldW, y + rowH);
         }
         // Highlight mismatched pair cells in amber
         const isMismatchedCell = hasMismatch && mmChecks.some(([a,b]) => {
@@ -1776,7 +1789,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         doc.text(val !== '' ? val : '—', cx, y + 4.6, { align:'center' });
       });
 
-      y += hasMismatch ? ROW_H + 3 : ROW_H;
+      y += rowH;
     });
 
     y += 2;
