@@ -1673,10 +1673,9 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
 
   // ── PRODUCT ROWS ──
   const ROW_H = 7;
-  const MISMATCH_EXTRA = 4; // extra height a mismatched row needs for its label + detail line
   const CAT_H = 5.5;
 
-  // Shared mismatch check — used for row height, page breaks, and highlighting
+  // Shared mismatch check — used for row highlighting
   const rowHasMismatch = p => {
     const q = quantities[selectedStore][p.id] || {};
     return [['Mix','Packed'],['Packed','Received']].some(([a,b]) => {
@@ -1689,8 +1688,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
     const prods = PRODUCTS.filter(p => p.cat === cat && (!p.stores || p.stores.includes(selectedStore)));
     if (!prods.length) return;
 
-    const mismatchCount = prods.filter(rowHasMismatch).length;
-    const needed = CAT_H + prods.length * ROW_H + mismatchCount * MISMATCH_EXTRA;
+    const needed = CAT_H + prods.length * ROW_H;
     if (y + needed > PH - 14) {
       drawFooter(doc, PW, PH, ML, MR);
       doc.addPage();
@@ -1718,50 +1716,38 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
 
     let alt = false;
     prods.forEach(p => {
-      // Check mismatches for this product first — the row's own height depends on it
       const q = quantities[selectedStore][p.id] || {};
       const mmChecks = [['Mix','Packed'],['Packed','Received']];
       const hasMismatch = rowHasMismatch(p);
-      const rowH = hasMismatch ? ROW_H + MISMATCH_EXTRA : ROW_H;
 
-      if (y + rowH > PH - 14) {
+      if (y + ROW_H > PH - 14) {
         drawFooter(doc, PW, PH, ML, MR);
         doc.addPage();
         y = 14;
       }
 
-      if (alt) { fill(252,249,245); doc.rect(ML, y, CW, rowH, 'F'); }
+      if (alt) { fill(252,249,245); doc.rect(ML, y, CW, ROW_H, 'F'); }
       alt = !alt;
 
       draw(238,228,215); doc.setLineWidth(0.12);
-      doc.line(ML, y + rowH, ML + CW, y + rowH);
+      doc.line(ML, y + ROW_H, ML + CW, y + ROW_H);
 
       // Vertical divider between name and fields
       draw(220,210,198); doc.setLineWidth(0.15);
-      doc.line(ML + NAME_W, y, ML + NAME_W, y + rowH);
+      doc.line(ML + NAME_W, y, ML + NAME_W, y + ROW_H);
 
-      // Highlight row if mismatch
+      // Highlight row if mismatch — just the colour, no label text
       if (hasMismatch) {
         fill(255,248,235);
-        doc.rect(ML, y, CW, rowH, 'F');
+        doc.rect(ML, y, CW, ROW_H, 'F');
         draw(184,115,51); doc.setLineWidth(0.4);
-        doc.rect(ML, y, CW, rowH, 'S');
+        doc.rect(ML, y, CW, ROW_H, 'S');
       }
 
       // Product name
       norm(8); rgb(hasMismatch ? 184 : 44, hasMismatch ? 115 : 26, hasMismatch ? 51 : 16);
       const nameLines = doc.splitTextToSize(p.name, NAME_W - 10);
       doc.text(nameLines[0], ML+3, y + 4.5);
-      if (hasMismatch) {
-        bold(7.5); rgb(184,115,51);
-        doc.text('⚠ MISMATCH', ML+3, y + 8.3);
-        // Detail which pairs mismatch
-        const mmNotes = mmChecks
-          .filter(([a,b]) => { const va=q[a],vb=q[b]; return va&&va!==''&&vb&&vb!==''&&parseInt(va)!==parseInt(vb); })
-          .map(([a,b]) => `${a}:${q[a]} ≠ ${b}:${q[b]}`).join('  ');
-        norm(6.5); rgb(184,115,51);
-        doc.text(mmNotes, ML+3, y + rowH - 1.5);
-      }
 
       // Field values - per-product
       const pFields = getFields(p);
@@ -1771,7 +1757,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         const cx = ML + NAME_W + i * pFieldW + pFieldW / 2;
         if (i > 0) {
           draw(230,220,210); doc.setLineWidth(0.1);
-          doc.line(ML + NAME_W + i * pFieldW, y, ML + NAME_W + i * pFieldW, y + rowH);
+          doc.line(ML + NAME_W + i * pFieldW, y, ML + NAME_W + i * pFieldW, y + ROW_H);
         }
         // Highlight mismatched pair cells in amber
         const isMismatchedCell = hasMismatch && mmChecks.some(([a,b]) => {
@@ -1789,7 +1775,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         doc.text(val !== '' ? val : '—', cx, y + 4.6, { align:'center' });
       });
 
-      y += rowH;
+      y += ROW_H;
     });
 
     y += 2;
