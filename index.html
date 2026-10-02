@@ -366,6 +366,15 @@
       color: var(--sage);
     }
 
+    /* Typed but not yet saved to Google Sheets — wins over has-value / mismatch */
+    .field-cell input.unsaved,
+    .field input.unsaved,
+    .notes-input.unsaved {
+      border-color: #C62828 !important;
+      background: #FDECEA !important;
+      color: #B71C1C !important;
+    }
+
     /* ── NOTES ── */
     .notes-input {
       width: 100%;
@@ -859,6 +868,126 @@ async function safeFetchJSON(r) {
   }
 }
 
+/* ── UNSAVED CHANGES ── */
+// Edits not yet saved to Google Sheets. Kept on this device per role + date so
+// a reload or a sleeping tablet doesn't lose them; cleared after a successful save.
+var unsaved = {};        // { store: { productId: { field: value } } }
+var unsavedExtras = {};  // { inputId: value } — store role only
+var EXTRA_FIELD_IDS = ['elec-open', 'elec-close', 'driver-arrived', 'driver-left', 'sheet-notes'];
+
+function draftKey() { return 'md_draft_' + currentRole + '_' + currentDate; }
+
+function hasUnsaved() {
+  if (Object.keys(unsavedExtras).length) return true;
+  return Object.keys(unsaved).some(function(s) { return Object.keys(unsaved[s]).length > 0; });
+}
+
+function persistDraft() {
+  if (!currentRole || !currentDate) return;
+  try {
+    if (hasUnsaved()) localStorage.setItem(draftKey(), JSON.stringify({ q: unsaved, x: unsavedExtras }));
+    else localStorage.removeItem(draftKey());
+  } catch(e) {}
+}
+
+function isUnsaved(store, id, field) {
+  return !!(unsaved[store] && unsaved[store][id] && unsaved[store][id][field] !== undefined);
+}
+
+function markUnsaved(store, id, field, value) {
+  if (!currentRole) return;
+  if (!unsaved[store]) unsaved[store] = {};
+  if (!unsaved[store][id]) unsaved[store][id] = {};
+  if (value === '') {
+    delete unsaved[store][id][field];
+    if (!Object.keys(unsaved[store][id]).length) delete unsaved[store][id];
+  } else {
+    unsaved[store][id][field] = value;
+  }
+  persistDraft();
+  updateSaveBtnState();
+}
+
+function onExtraInput(el) {
+  // Electricity / driver / notes are only saved by the store roles
+  if (['FHK','STB','JHK'].indexOf(currentRole) === -1) return;
+  if (el.value === '') delete unsavedExtras[el.id];
+  else unsavedExtras[el.id] = el.value;
+  el.classList.toggle('unsaved', el.value !== '');
+  persistDraft();
+  updateSaveBtnState();
+}
+
+// Bring back unsaved entries for this role + date. Never overwrites a value that
+// already came back from Google Sheets — only fills fields that are still empty.
+function restoreDraft() {
+  unsaved = {}; unsavedExtras = {};
+  var draft = null;
+  try { draft = JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch(e) {}
+  if (!draft) return 0;
+  var restored = 0;
+  Object.keys(draft.q || {}).forEach(function(store) {
+    if (!quantities[store]) return;
+    Object.keys(draft.q[store]).forEach(function(id) {
+      if (!quantities[store][id]) return;
+      Object.keys(draft.q[store][id]).forEach(function(f) {
+        if (quantities[store][id][f] !== '') return;
+        var v = draft.q[store][id][f];
+        quantities[store][id][f] = v;
+        if (!unsaved[store]) unsaved[store] = {};
+        if (!unsaved[store][id]) unsaved[store][id] = {};
+        unsaved[store][id][f] = v;
+        restored++;
+      });
+    });
+  });
+  Object.keys(draft.x || {}).forEach(function(elId) {
+    var el = document.getElementById(elId);
+    if (!el || el.value !== '') return;
+    el.value = draft.x[elId];
+    el.classList.add('unsaved');
+    unsavedExtras[elId] = draft.x[elId];
+    restored++;
+  });
+  persistDraft();
+  return restored;
+}
+
+function clearUnsaved() {
+  unsaved = {}; unsavedExtras = {};
+  persistDraft();
+  document.querySelectorAll('.unsaved').forEach(function(el) { el.classList.remove('unsaved'); });
+  updateSaveBtnState();
+}
+
+function updateSaveBtnState() {
+  var btn = document.getElementById('saveBtn');
+  if (!btn || btn.disabled) return;
+  var dirty = hasUnsaved();
+  btn.style.background = dirty ? '#E67E22' : 'var(--sage)';
+  btn.innerHTML = '<span style="font-size:18px;">💾</span> Save to Google Sheets' + (dirty ? ' — unsaved changes' : '');
+}
+
+// What actually went in the save, per store — so a store with nothing is obvious.
+function savedSummary() {
+  if (currentRole === 'bakery') {
+    var parts = ['FHK','STB','JHK'].map(function(s) {
+      var n = PRODUCTS.filter(function(p) {
+        var q = quantities[s][p.id];
+        return (!p.stores || p.stores.indexOf(s) !== -1) && (q.Packed !== '' || q.Loaded !== '');
+      }).length;
+      return { s: s, n: n };
+    });
+    var anyEmpty = parts.some(function(x) { return x.n === 0; });
+    return (anyEmpty ? '⚠️' : '✅') + ' Saved — ' + parts.map(function(x) { return x.s + ' ' + x.n; }).join(' · ');
+  }
+  var sf = currentRole === 'FHK' ? ['Received','Don','Stf','Fro','Bake'] : ['Received','Don','Ref','Stf','Fro'];
+  var n = PRODUCTS.filter(function(p) {
+    return sf.some(function(f) { return quantities[currentRole][p.id][f] !== ''; });
+  }).length;
+  return (n === 0 ? '⚠️' : '✅') + ' Saved — ' + currentRole + ' ' + n + ' products';
+}
+
 function showRoleStatus(msg, isError) {
   var el = document.getElementById('roleStatus');
   if (!el) return;
@@ -912,11 +1041,13 @@ function startRole(role) {
         .then(safeFetchJSON)
         .then(function(d) {
           applyForecastFromGAS(d);
+          var restored = restoreDraft();
           document.getElementById('sheet-date').value = date;
           document.getElementById('rolePicker').style.display = 'none';
           lockStoreSelector('bakery');
-          renderProducts(); renderActionButtons(); renderNameFields();
-          showToast('✅ Data loaded for all 3 stores');
+          renderProducts(); updateProgress(); renderActionButtons(); renderNameFields();
+          if (restored) showToast('↩️ ' + restored + ' unsaved entries restored — tap Save', 5000);
+          else showToast('✅ Data loaded for all 3 stores');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -930,11 +1061,13 @@ function startRole(role) {
         .then(safeFetchJSON)
         .then(function(d) {
           var cnt = applySheetFromGAS(d);
+          var restored = restoreDraft();
           document.getElementById('sheet-date').value = date;
           document.getElementById('rolePicker').style.display = 'none';
           lockStoreSelector(role);
-          renderProducts(); renderActionButtons(); renderNameFields();
-          showToast('✅ ' + role + ' loaded — ' + cnt + ' fields');
+          renderProducts(); updateProgress(); renderActionButtons(); renderNameFields();
+          if (restored) showToast('↩️ ' + restored + ' unsaved entries restored — tap Save', 5000);
+          else showToast('✅ ' + role + ' loaded — ' + cnt + ' fields');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -1078,11 +1211,13 @@ async function saveToSheets() {
     var r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: form });
     var result = await safeFetchJSON(r);
     if (result.error) throw new Error(result.error);
-    showToast('✅ Saved to Google Sheets');
+    var summary = savedSummary();
+    clearUnsaved();
+    showToast(summary, 6000);
   } catch(e) {
-    showToast('❌ Save failed: ' + e.message);
+    showToast('❌ Save failed: ' + e.message, 6000);
   } finally {
-    if (btn) { btn.textContent = '💾 Save to Google Sheets'; btn.disabled = false; }
+    if (btn) { btn.disabled = false; updateSaveBtnState(); }
     hideSavingOverlay();
   }
 }
@@ -1121,6 +1256,13 @@ function init() {
   const d = String(today.getDate()).padStart(2,'0');
   const todayISO = `${y}-${m}-${d}`;
   document.getElementById('sheet-date').value = todayISO;
+
+  EXTRA_FIELD_IDS.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input',  function() { onExtraInput(el); });
+    el.addEventListener('change', function() { onExtraInput(el); });
+  });
 
   // Google Sheets flow: role picker is shown by default (display:flex in HTML)
   initRolePicker(); // set today's date in picker
@@ -1309,6 +1451,7 @@ function renderProducts() {
       if (!inp) return;
       inp.value = val;
       inp.classList.add('has-value');
+      if (isUnsaved(selectedStore, p.id, f)) inp.classList.add('unsaved');
     });
     const anyFilled = fields.some(f => quantities[selectedStore][p.id][f] !== '');
     const dot = document.getElementById('dot-' + p.id);
@@ -1331,6 +1474,9 @@ function handleInput(id, field, val) {
   const inp = document.getElementById(`qty-${id}-${field}`);
   if (v !== '') inp.classList.add('has-value');
   else          inp.classList.remove('has-value');
+
+  markUnsaved(selectedStore, id, field, quantities[selectedStore][id][field]);
+  inp.classList.toggle('unsaved', isUnsaved(selectedStore, id, field));
 
   // Update status dot — filled if any field has a value
   const prod = PRODUCTS.find(x => x.id === id);
@@ -1531,6 +1677,8 @@ function renderActionButtons() {
     bPDF.onclick = showPDFTypePicker;
     wrap.appendChild(bPDF);
   }
+
+  updateSaveBtnState();
 }
 
 /* ── EXPORT STAGE ── */
@@ -2003,11 +2151,12 @@ function applyForecastFromServer(normalData, cornettiData, packingDate) {
 }
 
 /* ── TOAST ── */
-function showToast(msg) {
+function showToast(msg, ms) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove('show'), ms || 2800);
 }
 
 /* ── SAVING OVERLAY ── */
