@@ -1151,8 +1151,30 @@ function applySheetFromGAS(data) {
       var el2 = document.getElementById('elec-open');
       if (el2) el2.value = savedElec;
     }
+    // Reload anything already saved earlier in the day, so a later save doesn't blank it
+    var setIfEmpty = function(id, v) {
+      var f = document.getElementById(id);
+      if (f && f.value === '' && v !== '') f.value = v;
+    };
+    var hasVal = function(v) { return v !== undefined && v !== null && String(v) !== ''; };
+    setIfEmpty('elec-close',     hasVal(m.ElecClose) ? String(m.ElecClose) : '');
+    setIfEmpty('sheet-notes',    hasVal(m.Notes) ? String(m.Notes) : '');
+    // The sheet's header is "DriverArrived " (trailing space) — accept either spelling
+    setIfEmpty('driver-arrived', toTimeValue(hasVal(m.DriverArrived) ? m.DriverArrived : m['DriverArrived ']));
+    setIfEmpty('driver-left',    toTimeValue(m.DriverLeft));
   }
   return matched;
+}
+
+// Sheets returns time cells as a 1899-12-30 date; time inputs need "HH:MM"
+function toTimeValue(v) {
+  if (v === undefined || v === null || v === '') return '';
+  var s = String(v);
+  var hm = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hm) return hm[1].padStart(2, '0') + ':' + hm[2];
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 async function saveToSheets() {
