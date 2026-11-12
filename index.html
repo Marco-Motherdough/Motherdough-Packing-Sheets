@@ -183,7 +183,7 @@
     /* ── STORE TOGGLE ── */
     .store-toggle {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 8px;
       margin-bottom: 4px;
     }
@@ -571,6 +571,10 @@
           <span class="store-code">JHK</span>
           <span class="store-name">Jonkershoek</span>
         </button>
+        <button class="store-btn" data-store="BAR" onclick="setStore('BAR',this)">
+          <span class="store-code">BAR</span>
+          <span class="store-name">Aperò bar</span>
+        </button>
       </div>
     </div>
 
@@ -608,6 +612,9 @@
         </button>
         <button onclick="startRole('JHK')" style="padding:14px 18px;background:#3A6B8A;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
           🏪 JHK — Jonkershoek store
+        </button>
+        <button onclick="startRole('BAR')" style="padding:14px 18px;background:#6B3A5C;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">
+          🍸 BAR — Aperò bar (STB)
         </button>
       </div>
       <div id="roleStatus" style="margin-top:12px;font-size:12px;color:#8A7060;text-align:center;"></div>
@@ -763,9 +770,19 @@ function getFieldLabel(f) {
   return f;
 }
 
+// BAR = the Aperò bar at STB, its own pastry drop
+const STORE_CODES = ['FHK','STB','JHK','BAR'];
+
+// BAR has no fixed product list yet: it only shows products with a Mix above 0 for BAR
+function productInStore(p, store) {
+  if (p.stores && p.stores.indexOf(store) === -1) return false;
+  if (store === 'BAR') return Number(quantities.BAR[p.id].Mix) > 0;
+  return true;
+}
+
 let selectedStore = 'FHK';
 const quantities = {};
-['FHK','STB','JHK'].forEach(s => {
+STORE_CODES.forEach(s => {
   quantities[s] = {};
   PRODUCTS.forEach(p => {
     quantities[s][p.id] = {};
@@ -797,7 +814,7 @@ function b64dec(str) {
 function encodeSnapshot(snapshot) {
   // Only store non-empty quantities to keep URL short
   const q = {};
-  ['FHK','STB','JHK'].forEach(store => {
+  STORE_CODES.forEach(store => {
     q[store] = {};
     PRODUCTS.forEach(p => {
       const fields = {};
@@ -825,7 +842,7 @@ function encodeSnapshot(snapshot) {
 function decodeSnapshot(hash) {
   const c = JSON.parse(b64dec(hash));
   const quantities = {};
-  ['FHK','STB','JHK'].forEach(store => {
+  STORE_CODES.forEach(store => {
     quantities[store] = {};
     PRODUCTS.forEach(p => {
       quantities[store][p.id] = {};
@@ -914,7 +931,7 @@ function markUnsaved(store, id, field, value) {
 
 function onExtraInput(el) {
   // Electricity / driver / notes are only saved by the store roles
-  if (['FHK','STB','JHK'].indexOf(currentRole) === -1) return;
+  if (STORE_CODES.indexOf(currentRole) === -1) return;
   if (el.value === '') delete unsavedExtras[el.id];
   else unsavedExtras[el.id] = el.value;
   el.classList.toggle('unsaved', el.value !== '');
@@ -975,13 +992,14 @@ function updateSaveBtnState() {
 // What actually went in the save, per store — so a store with nothing is obvious.
 function savedSummary() {
   if (currentRole === 'bakery') {
-    var parts = ['FHK','STB','JHK'].map(function(s) {
-      var n = PRODUCTS.filter(function(p) {
+    var parts = STORE_CODES.map(function(s) {
+      var shown = PRODUCTS.filter(function(p) { return productInStore(p, s); });
+      var n = shown.filter(function(p) {
         var q = quantities[s][p.id];
-        return (!p.stores || p.stores.indexOf(s) !== -1) && (q.Packed !== '' || q.Loaded !== '');
+        return q.Packed !== '' || q.Loaded !== '';
       }).length;
-      return { s: s, n: n };
-    });
+      return { s: s, n: n, shown: shown.length };
+    }).filter(function(x) { return x.shown > 0; }); // BAR drops out on days with no BAR forecast
     var anyEmpty = parts.some(function(x) { return x.n === 0; });
     return (anyEmpty ? '⚠️' : '✅') + ' Saved — ' + parts.map(function(x) { return x.s + ' ' + x.n; }).join(' · ');
   }
@@ -1051,7 +1069,7 @@ function startRole(role) {
           lockStoreSelector('bakery');
           renderProducts(); updateProgress(); renderActionButtons(); renderNameFields();
           if (restored) showToast('↩️ ' + restored + ' unsaved entries restored — tap Save', 5000);
-          else showToast('✅ Data loaded for all 3 stores');
+          else showToast('✅ Data loaded for all stores');
         })
         .catch(function(e) {
           showRoleStatus('❌ ' + e.message, true);
@@ -1087,7 +1105,7 @@ function startRole(role) {
 }
 
 function applyForecastFromGAS(data) {
-  var STORES = ['FHK', 'STB', 'JHK'];
+  var STORES = STORE_CODES;
   if (!data || !data.entries) return;
 
   // Restore quantities (Mix, Packed, Loaded)
@@ -1197,7 +1215,7 @@ async function saveToSheets() {
     var payload;
     if (currentRole === 'bakery') {
       var data = {};
-      ['FHK','STB','JHK'].forEach(function(store) {
+      STORE_CODES.forEach(function(store) {
         data[store] = {};
         PRODUCTS.forEach(function(p) {
           data[store][p.id] = {
@@ -1361,7 +1379,7 @@ function applyPrefill() {
 
   // Restore all quantities for all stores
   if (PREFILL_DATA.quantities) {
-    ['FHK','STB','JHK'].forEach(s => {
+    STORE_CODES.forEach(s => {
       if (PREFILL_DATA.quantities[s]) {
         PRODUCTS.forEach(p => {
           ALL_FIELDS.forEach(f => {
@@ -1401,13 +1419,13 @@ function setStore(code, btn) {
 function renderProducts() {
   // JHK doesn't track electricity units — hide the whole card for that store
   const elecCard = document.getElementById('electricityCard');
-  if (elecCard) elecCard.style.display = selectedStore === 'JHK' ? 'none' : '';
+  if (elecCard) elecCard.style.display = (selectedStore === 'JHK' || selectedStore === 'BAR') ? 'none' : '';
 
   const container = document.getElementById('productSections');
   container.innerHTML = '';
 
   CATEGORIES.forEach(cat => {
-    const prods = PRODUCTS.filter(p => p.cat === cat && (!p.stores || p.stores.includes(selectedStore)));
+    const prods = PRODUCTS.filter(p => p.cat === cat && productInStore(p, selectedStore));
     if (!prods.length) return;
 
     const sec = document.createElement('div');
@@ -1466,6 +1484,11 @@ function renderProducts() {
     sec.appendChild(body);
     container.appendChild(sec);
   });
+
+  if (selectedStore === 'BAR' && !container.children.length) {
+    container.innerHTML = '<div class="card" style="text-align:center;color:var(--text-muted);font-size:14px;">' +
+      'No pastries forecast for the BAR on this date.<br>Products appear here once they have a Mix for BAR.</div>';
+  }
 
   // Restore saved values into freshly created inputs
   PRODUCTS.forEach(p => {
@@ -1556,10 +1579,10 @@ function checkMismatches(id) {
 }
 
 function updateProgress() {
-  const storeProd = PRODUCTS.filter(p => !p.stores || p.stores.includes(selectedStore));
+  const storeProd = PRODUCTS.filter(p => productInStore(p, selectedStore));
   const filled = storeProd.filter(p => getFields(p).some(f => quantities[selectedStore][p.id][f] !== '')).length;
   const total  = storeProd.length;
-  const pct    = Math.round((filled / total) * 100);
+  const pct    = total ? Math.round((filled / total) * 100) : 0;
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressLabel').textContent = `${filled} of ${total} products filled`;
 }
@@ -1688,7 +1711,7 @@ function renderActionButtons() {
     wrap.appendChild(bSave);
   }
 
-  if (['FHK','STB','JHK'].includes(currentRole)) {
+  if (STORE_CODES.includes(currentRole)) {
     const bSave = document.createElement('button');
     bSave.id = 'saveBtn';
     bSave.style.cssText = btnStyle + 'background:var(--sage);color:white;box-shadow:0 4px 20px rgba(74,122,92,0.3);';
@@ -1781,7 +1804,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   const ML = 12, MR = 12;
   const CW = PW - ML - MR;
 
-  const storeNames = { FHK: 'Franschhoek', STB: 'Stellenbosch', JHK: 'Jonkershoek' };
+  const storeNames = { FHK: 'Franschhoek', STB: 'Stellenbosch', JHK: 'Jonkershoek', BAR: 'Aperò bar (STB)' };
   const dateLabel = new Date(dateVal + 'T12:00:00Z')
     .toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
@@ -1825,7 +1848,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   bold(8.5); rgb(44,26,16);
   const staffName = (stockType === 'Closing Stock' ? allNames.storeClose : allNames.storeOpen) || allNames.mix || '—';
   doc.text(staffName, ML+70, y+7.5);
-  const storeProdsPDF = PRODUCTS.filter(p => !p.stores || p.stores.includes(selectedStore));
+  const storeProdsPDF = PRODUCTS.filter(p => productInStore(p, selectedStore));
   const filledCount = storeProdsPDF.filter(p => getFields(p).some(f => quantities[selectedStore][p.id][f] !== '')).length;
   bold(7); rgb(44,26,16);
   doc.text('ITEMS FILLED', ML+140, y+3.5);
@@ -1859,7 +1882,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
   };
 
   CATEGORIES.forEach(cat => {
-    const prods = PRODUCTS.filter(p => p.cat === cat && (!p.stores || p.stores.includes(selectedStore)));
+    const prods = PRODUCTS.filter(p => p.cat === cat && productInStore(p, selectedStore));
     if (!prods.length) return;
 
     const needed = CAT_H + prods.length * ROW_H;
