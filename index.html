@@ -773,11 +773,18 @@ function getFieldLabel(f) {
 // BAR = the Aperò bar at STB, its own pastry drop
 const STORE_CODES = ['FHK','STB','JHK','BAR'];
 
-// BAR has no fixed product list yet: it only shows products with a Mix above 0 for BAR
+// The pastries BAR always lists, whether or not it has a Mix that day
+const BAR_SKUS = ['C-P001','C-A001','F-C002','CNFS001','PADC001','C-HPS001',
+                  'B-AJ001','B-LC001','10022','Z-S001','CB-S001','MCB001'];
+
 function productInStore(p, store) {
-  if (p.stores && p.stores.indexOf(store) === -1) return false;
-  if (store === 'BAR') return Number(quantities.BAR[p.id].Mix) > 0;
-  return true;
+  if (store === 'BAR') return BAR_SKUS.indexOf(p.sku) !== -1;
+  return !p.stores || p.stores.indexOf(store) !== -1;
+}
+
+// BAR shows an empty Mix/Packed/Loaded as 0 (display only — nothing is saved)
+function showsZeroWhenEmpty(store, f) {
+  return store === 'BAR' && (f === 'Mix' || f === 'Packed' || f === 'Loaded');
 }
 
 let selectedStore = 'FHK';
@@ -998,9 +1005,10 @@ function savedSummary() {
         var q = quantities[s][p.id];
         return q.Packed !== '' || q.Loaded !== '';
       }).length;
-      return { s: s, n: n, shown: shown.length };
-    }).filter(function(x) { return x.shown > 0; }); // BAR drops out on days with no BAR forecast
-    var anyEmpty = parts.some(function(x) { return x.n === 0; });
+      var expected = s !== 'BAR' || shown.some(function(p) { return Number(quantities.BAR[p.id].Mix) > 0; });
+      return { s: s, n: n, expected: expected };
+    });
+    var anyEmpty = parts.some(function(x) { return x.expected && x.n === 0; });
     return (anyEmpty ? '⚠️' : '✅') + ' Saved — ' + parts.map(function(x) { return x.s + ' ' + x.n; }).join(' · ');
   }
   var sf = currentRole === 'FHK' ? ['Received','Don','Stf','Fro','Bake'] : ['Received','Don','Ref','Stf','Fro'];
@@ -1238,6 +1246,10 @@ async function saveToSheets() {
           : ['Received','Don','Ref','Stf','Fro'];
         var entry = {};
         sf.forEach(function(f) { entry[f] = quantities[store][p.id][f] || ''; });
+        if (store === 'BAR') {
+          if (!productInStore(p, 'BAR')) return;
+          entry.SKU = p.sku; entry.Category = p.cat; entry.ProductName = p.name;
+        }
         storeData[p.id] = entry;
       });
       var elec = {
@@ -1459,7 +1471,7 @@ function renderProducts() {
             type="number"
             id="qty-${p.id}-${f}"
             min="0"
-            placeholder="—"
+            placeholder="${showsZeroWhenEmpty(selectedStore, f) ? '0' : '—'}"
             ${isLocked ? 'readonly style="background:rgba(184,115,51,0.08);border-color:var(--amber);cursor:not-allowed;" title="Filled by previous stage"' : `oninput="handleInput(${p.id}, '${f}', this.value)"`}
           />
         </div>`;
@@ -1484,11 +1496,6 @@ function renderProducts() {
     sec.appendChild(body);
     container.appendChild(sec);
   });
-
-  if (selectedStore === 'BAR' && !container.children.length) {
-    container.innerHTML = '<div class="card" style="text-align:center;color:var(--text-muted);font-size:14px;">' +
-      'No pastries forecast for the BAR on this date.<br>Products appear here once they have a Mix for BAR.</div>';
-  }
 
   // Restore saved values into freshly created inputs
   PRODUCTS.forEach(p => {
@@ -1969,7 +1976,7 @@ function buildPDF(dateVal, allNames, notesVal, elecOpen, elecClose, driverArrive
         } else {
           norm(8); rgb(190,175,160);
         }
-        doc.text(val !== '' ? val : '—', cx, y + 4.6, { align:'center' });
+        doc.text(val !== '' ? val : (showsZeroWhenEmpty(selectedStore, f) ? '0' : '—'), cx, y + 4.6, { align:'center' });
       });
 
       y += ROW_H;
