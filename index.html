@@ -777,8 +777,16 @@ const STORE_CODES = ['FHK','STB','JHK','BAR'];
 const BAR_SKUS = ['C-P001','C-A001','F-C002','CNFS001','PADC001','C-HPS001',
                   'B-AJ001','B-LC001','10022','Z-S001','CB-S001','MCB001'];
 
+// Breads BAR can receive (from 20 Nov 2026). Unlike the pastries, a bread line
+// only shows for BAR when it has a Mix above 0 that day, to keep the list short.
+const BAR_BREAD_SKUS = ['CWS001','CR002','SEM1','SL001','B-1WS001','OL001','CIA001','B-LR&B001','BAG001'];
+
 function productInStore(p, store) {
-  if (store === 'BAR') return BAR_SKUS.indexOf(p.sku) !== -1;
+  if (store === 'BAR') {
+    if (BAR_SKUS.indexOf(p.sku) !== -1) return true;
+    if (BAR_BREAD_SKUS.indexOf(p.sku) !== -1) return Number(quantities.BAR[p.id].Mix) > 0;
+    return false;
+  }
   return !p.stores || p.stores.indexOf(store) !== -1;
 }
 
