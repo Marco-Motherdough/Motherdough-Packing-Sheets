@@ -626,7 +626,7 @@
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill" id="progressFill"></div>
     </div>
-    <div class="progress-label" id="progressLabel">0 of 31 products filled</div>
+    <div class="progress-label" id="progressLabel">0 of 33 products filled</div>
   </div>
 
   <!-- PRODUCTS -->
@@ -713,8 +713,11 @@ const PREFILL_DATA = null;
 const PRODUCTS = [
   // Breads
   { id:1,  name:'Classic White',       sku:'CWS001',       emoji:'🍞', cat:'Breads' },
+  // sendDetails: store saves include SKU/Category/Name, so saveStore can create a missing row
+  { id:36, name:'Baby Classic White',  sku:'BBCW-001',     emoji:'🍞', cat:'Breads', sendDetails:true },
   { id:2,  name:'Semolina',            sku:'SEM1',         emoji:'🍞', cat:'Breads' },
   { id:3,  name:'Seed',                sku:'B-1WS001',     emoji:'🍞', cat:'Breads' },
+  { id:37, name:'Baby Seeded Wholewheat', sku:'BBSW-001',  emoji:'🍞', cat:'Breads', sendDetails:true },
   { id:4,  name:'Olive',               sku:'OL001',        emoji:'🫒', cat:'Breads' },
   { id:5,  name:'Ciabatta',            sku:'CIA001',       emoji:'🍞', cat:'Breads' },
   { id:6,  name:'Rye',                 sku:'B-LR&B001',    emoji:'🍞', cat:'Breads' },
@@ -779,7 +782,8 @@ const BAR_SKUS = ['C-P001','C-A001','F-C002','CNFS001','PADC001','C-HPS001',
 
 // Breads BAR can receive (from 20 Nov 2026). Unlike the pastries, a bread line
 // only shows for BAR when it has a Mix above 0 that day, to keep the list short.
-const BAR_BREAD_SKUS = ['CWS001','CR002','SEM1','SL001','B-1WS001','OL001','CIA001','B-LR&B001','BAG001'];
+const BAR_BREAD_SKUS = ['CWS001','CR002','SEM1','SL001','B-1WS001','OL001','CIA001','B-LR&B001','BAG001',
+                        'BBCW-001','BBSW-001'];
 
 function productInStore(p, store) {
   if (store === 'BAR') {
@@ -1254,8 +1258,8 @@ async function saveToSheets() {
           : ['Received','Don','Ref','Stf','Fro'];
         var entry = {};
         sf.forEach(function(f) { entry[f] = quantities[store][p.id][f] || ''; });
-        if (store === 'BAR') {
-          if (!productInStore(p, 'BAR')) return;
+        if (store === 'BAR' && !productInStore(p, 'BAR')) return;
+        if (store === 'BAR' || p.sendDetails) {
           entry.SKU = p.sku; entry.Category = p.cat; entry.ProductName = p.name;
         }
         storeData[p.id] = entry;
