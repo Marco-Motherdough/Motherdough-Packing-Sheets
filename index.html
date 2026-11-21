@@ -753,7 +753,8 @@ const PRODUCTS = [
   { id:27, name:'Zeppola - single',         sku:'Z-S001',   emoji:'🍩', cat:'Bomboloni' },
   // Pizza — store-specific
   { id:34, name:'Pizza Balls',              sku:'PZB001',   emoji:'🍕', cat:'Pizza', stores:['JHK'] },
-  { id:35, name:'Pizza Ball Trays',         sku:'PZBT001',  emoji:'🍕', cat:'Pizza', stores:['FHK','STB'] },
+  // whenMixed: also shown for these stores, but only on days they have a Mix (JHK gets trays on Fridays)
+  { id:35, name:'Pizza Ball Trays',         sku:'PZBT001',  emoji:'🍕', cat:'Pizza', stores:['FHK','STB'], whenMixed:['JHK'] },
   { id:38, name:'Mini Pizza Balls - JHK',   sku:'PZBM001',  emoji:'🍕', cat:'Pizza', stores:['JHK'] },
   { id:39, name:'Pizza Dough Big Ball 3.6kg - STB', sku:'PZDB001', emoji:'🍕', cat:'Pizza', stores:['STB'] },
 ];
@@ -793,6 +794,7 @@ function productInStore(p, store) {
     if (BAR_BREAD_SKUS.indexOf(p.sku) !== -1) return Number(quantities.BAR[p.id].Mix) > 0;
     return false;
   }
+  if (p.whenMixed && p.whenMixed.indexOf(store) !== -1) return Number(quantities[store][p.id].Mix) > 0;
   return !p.stores || p.stores.indexOf(store) !== -1;
 }
 
